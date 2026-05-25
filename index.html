@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#141210" />
+<title>StockScan</title>
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     DESIGN LANGUAGE (preserved): warehouse / industrial, mobile-first
+     bg #f4f1ec · ink #141210 · orange accent #ff5a1f
+     Archivo (headings/labels) + IBM Plex Mono (data)
+     ============================================================ */
+  :root{
+    --bg:#f4f1ec; --ink:#141210; --orange:#ff5a1f;
+    --paper:#fffdf8; --line:#141210; --muted:#6f685d;
+    --ok:#1f8a4c; --warn:#c4391b; --low:#c47b00;
+    --r:14px; --maxw:520px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Archivo",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+  .app{max-width:var(--maxw);margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;
+    padding-bottom:env(safe-area-inset-bottom)}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select{font-family:inherit;font-size:16px}
+  .hide{display:none !important}
+
+  /* ---------- header ---------- */
+  header{position:sticky;top:0;z-index:20;background:var(--ink);color:var(--bg);
+    padding:calc(env(safe-area-inset-top) + 12px) 14px 12px;
+    display:flex;align-items:center;gap:10px;border-bottom:3px solid var(--orange)}
+  .logo{display:flex;align-items:center;gap:9px;user-select:none}
+  .logo .mark{width:30px;height:30px;border:2px solid var(--orange);border-radius:7px;
+    display:grid;place-items:center;background:#0c0b0a;flex:0 0 auto}
+  .logo .mark span{display:flex;gap:2px}
+  .logo .mark i{display:block;width:2px;height:15px;background:var(--orange)}
+  .logo .mark i:nth-child(2){height:11px}.logo .mark i:nth-child(3){height:15px;width:3px}
+  .logo .mark i:nth-child(4){height:9px}.logo .mark i:nth-child(5){height:15px}
+  .logo h1{font-size:15px;font-weight:800;letter-spacing:.04em;line-height:1;margin:0;text-transform:uppercase}
+  .logo small{display:block;font-size:9.5px;color:var(--orange);letter-spacing:.22em;font-weight:600}
+  header .spacer{flex:1}
+  .lang{display:flex;border:1.5px solid #4a443c;border-radius:9px;overflow:hidden}
+  .lang button{padding:6px 9px;font-size:11px;font-weight:700;color:#b8b1a6;letter-spacing:.04em}
+  .lang button.on{background:var(--orange);color:#141210}
+  .net{font-size:9px;letter-spacing:.1em;padding:3px 6px;border-radius:6px;font-weight:700;text-transform:uppercase}
+  .net.online{background:#143; color:#7bf0a8}
+  .net.offline{background:#411;color:#ffb4a1}
+  .net.local{background:#3a2f17;color:#ffce8a}
+
+  /* ---------- stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+    border-bottom:1px solid var(--line)}
+  .stat{background:var(--paper);padding:10px 8px;text-align:center}
+  .stat .k{font-size:9px;letter-spacing:.13em;color:var(--muted);text-transform:uppercase;font-weight:700}
+  .stat .v{font-size:18px;font-weight:700;margin-top:3px}
+  .stat .v.mono{font-size:16px}
+  .stat.warnv .v{color:var(--low)}
+
+  /* ---------- tabs ---------- */
+  nav.tabs{display:flex;background:var(--paper);border-bottom:1px solid var(--line)}
+  nav.tabs button{flex:1;padding:13px 4px;font-size:12px;font-weight:800;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);border-bottom:3px solid transparent}
+  nav.tabs button.on{color:var(--ink);border-bottom-color:var(--orange)}
+
+  main{flex:1;position:relative}
+  .view{padding:14px;display:none}
+  .view.on{display:block}
+
+  /* ---------- inventory toolbar ---------- */
+  .toolbar{display:flex;gap:8px;margin-bottom:10px}
+  .search{flex:1;display:flex;align-items:center;gap:8px;background:var(--paper);
+    border:1.5px solid var(--line);border-radius:10px;padding:9px 11px}
+  .search input{border:none;background:none;outline:none;width:100%;color:var(--ink)}
+  .search input::placeholder{color:var(--muted)}
+  .chip{border:1.5px solid var(--line);border-radius:10px;padding:0 12px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.04em;background:var(--paper);display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .chip.on{background:var(--orange);border-color:var(--orange)}
+  .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--low)}
+
+  /* ---------- product list ---------- */
+  .list{display:flex;flex-direction:column;gap:8px}
+  .empty{text-align:center;color:var(--muted);padding:40px 10px;font-size:13px}
+  .item{background:var(--paper);border:1.5px solid var(--line);border-radius:var(--r);padding:11px 12px;
+    display:flex;align-items:center;gap:11px}
+  .item:active{transform:scale(.995)}
+  .item .body{flex:1;min-width:0}
+  .item .nm{font-weight:700;font-size:14.5px;line-height:1.15;display:flex;align-items:center;gap:6px}
+  .item .meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+  .item .meta .code{font-family:"IBM Plex Mono",monospace;color:var(--ink);font-weight:600}
+  .tag{font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+    padding:2px 5px;border-radius:5px;border:1px solid var(--line)}
+  .tag.serial{background:#eae3d6}
+  .badge-low{font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#fff;
+    background:var(--low);padding:2px 6px;border-radius:5px}
+  .item .qty{text-align:right;flex:0 0 auto}
+  .item .qty .n{font-family:"IBM Plex Mono",monospace;font-size:21px;font-weight:600;line-height:1}
+  .item .qty .n.low{color:var(--low)}
+  .item .qty .u{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+  .item .qty .val{font-size:10px;color:var(--muted);margin-top:3px;font-family:"IBM Plex Mono",monospace}
+
+  /* ---------- buttons ---------- */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1.5px solid var(--line);
+    border-radius:11px;padding:12px 14px;font-weight:800;font-size:13px;letter-spacing:.03em;
+    text-transform:uppercase;background:var(--paper)}
+  .btn.primary{background:var(--orange);border-color:var(--orange)}
+  .btn.dark{background:var(--ink);color:var(--bg)}
+  .btn.block{width:100%}
+  .btn.sm{padding:9px 11px;font-size:11px;border-radius:9px}
+  .btn:disabled{opacity:.45}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+
+  /* ---------- scan view ---------- */
+  .scanwrap{background:#0c0b0a;border:2px solid var(--line);border-radius:var(--r);overflow:hidden;
+    position:relative;aspect-ratio:3/4;display:grid;place-items:center}
+  .scanwrap video{width:100%;height:100%;object-fit:cover;display:none}
+  .scanwrap.live video{display:block}
+  .scan-ph{color:#8a8275;text-align:center;padding:24px;font-size:13px}
+  .scan-ph .mk{font-size:34px;margin-bottom:8px}
+  .reticle{position:absolute;inset:14% 10%;border:2px solid rgba(255,90,31,.85);border-radius:12px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.28);display:none;pointer-events:none}
+  .scanwrap.live .reticle{display:block}
+  .reticle .laser{position:absolute;left:6%;right:6%;top:50%;height:2px;background:var(--orange);
+    box-shadow:0 0 9px 1px var(--orange);animation:sweep 2s ease-in-out infinite}
+  @keyframes sweep{0%,100%{top:18%}50%{top:82%}}
+  .modeswitch{display:flex;border:2px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0}
+  .modeswitch button{flex:1;padding:13px;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .modeswitch button.on[data-m="in"]{background:var(--ok);color:#fff}
+  .modeswitch button.on[data-m="out"]{background:var(--warn);color:#fff}
+  .toggle-line{display:flex;align-items:center;justify-content:space-between;background:var(--paper);
+    border:1.5px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:10px}
+  .toggle-line .lbl{font-size:12.5px;font-weight:700}
+  .toggle-line .lbl small{display:block;font-size:10px;color:var(--muted);font-weight:500;text-transform:none;letter-spacing:0}
+  .sw{width:46px;height:26px;border-radius:13px;background:#cfc7ba;border:1.5px solid var(--line);position:relative;flex:0 0 auto}
+  .sw::after{content:"";position:absolute;top:1px;left:1px;width:20px;height:20px;border-radius:50%;background:#fff;border:1px solid var(--line);transition:.15s}
+  .sw.on{background:var(--orange)}.sw.on::after{left:22px}
+  .manual{display:flex;gap:8px;margin-top:4px}
+  .manual input{flex:1;border:1.5px solid var(--line);border-radius:11px;padding:11px 12px;background:var(--paper);outline:none}
+  .shelf-line{margin:0 0 10px}
+  .shelf-line label{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:5px}
+  .shelf-line input{width:100%;border:1.5px solid var(--line);border-radius:11px;padding:11px 12px;background:var(--paper);outline:none}
+  .shelf-line input:focus{border-color:var(--orange)}
+  .scan-readout{margin-top:12px;background:var(--paper);border:1.5px dashed var(--line);border-radius:11px;
+    padding:10px 12px;font-size:12px;min-height:42px}
+  .scan-readout .k{font-size:9px;letter-spacing:.13em;color:var(--muted);text-transform:uppercase;font-weight:700}
+  .scan-readout .v{font-family:"IBM Plex Mono",monospace;font-weight:600;margin-top:2px;word-break:break-all}
+
+  /* ---------- bottom sheet / modal ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(20,18,16,.55);z-index:40;display:none;backdrop-filter:blur(2px)}
+  .scrim.on{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;max-width:var(--maxw);margin:0 auto;
+    background:var(--bg);border-radius:20px 20px 0 0;border:2px solid var(--line);border-bottom:none;
+    transform:translateY(100%);transition:transform .22s cubic-bezier(.2,.8,.2,1);
+    max-height:92dvh;overflow-y:auto;padding:0 16px calc(20px + env(safe-area-inset-bottom))}
+  .sheet.on{transform:translateY(0)}
+  .grip{width:42px;height:5px;border-radius:3px;background:#cabfac;margin:9px auto 4px}
+  .sheet h2{font-size:19px;font-weight:800;margin:6px 0 2px}
+  .sheet .sub{font-size:11px;color:var(--muted);font-family:"IBM Plex Mono",monospace;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .field{margin-bottom:11px}
+  .field label{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:5px}
+  .field input,.field select{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--paper);outline:none}
+  .field .two{display:flex;gap:9px}.field .two>*{flex:1}
+  .seg{display:flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{flex:1;padding:11px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .seg button.on{background:var(--ink);color:var(--bg)}
+
+  .qtybig{display:flex;align-items:center;justify-content:center;gap:16px;margin:6px 0 12px}
+  .qtybig button{width:54px;height:54px;border-radius:14px;border:2px solid var(--line);font-size:26px;font-weight:700;background:var(--paper)}
+  .qtybig button.primary{background:var(--orange);border-color:var(--orange)}
+  .qtybig .num{font-family:"IBM Plex Mono",monospace;font-size:40px;font-weight:600;min-width:90px;text-align:center}
+  .qtybig .num small{display:block;font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+  .valueline{display:flex;justify-content:space-between;background:var(--paper);border:1.5px solid var(--line);
+    border-radius:11px;padding:11px 13px;font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;margin-bottom:12px}
+  .valueline span:first-child{color:var(--muted);font-family:"Archivo";font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
+
+  .serlist{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+  .serlist .sr{display:flex;align-items:center;gap:8px;background:var(--paper);border:1.5px solid var(--line);
+    border-radius:9px;padding:8px 10px;font-family:"IBM Plex Mono",monospace;font-size:12px}
+  .serlist .sr .s{flex:1;font-weight:600;word-break:break-all}
+  .serlist .sr .t{font-size:9px;color:var(--muted)}
+  .hist{margin-top:8px}
+  .hist .h{display:flex;gap:8px;align-items:center;font-size:11px;padding:5px 0;border-top:1px solid #e2dacc}
+  .hist .h .pill{font-size:8.5px;font-weight:800;text-transform:uppercase;padding:2px 5px;border-radius:5px;color:#fff}
+  .hist .h .pill.in{background:var(--ok)}.hist .h .pill.out{background:var(--warn)}
+  .hist .h .sn{font-family:"IBM Plex Mono",monospace;font-weight:600;flex:1;word-break:break-all}
+  .hist .h .when{color:var(--muted);font-family:"IBM Plex Mono",monospace}
+  .section-h{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:14px 0 7px}
+
+  /* ---------- toast + snackbar ---------- */
+  .toasts{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:0;right:0;z-index:80;
+    display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 12px}
+  .toast{max-width:var(--maxw);width:100%;background:var(--ink);color:var(--bg);border-radius:11px;
+    padding:11px 14px;font-size:13px;font-weight:600;display:flex;gap:10px;align-items:center;
+    border-left:5px solid var(--ok);box-shadow:0 8px 24px rgba(0,0,0,.25);animation:drop .2s ease}
+  .toast.warn{border-left-color:var(--low)}.toast.err{border-left-color:var(--warn)}
+  .toast .ic{font-size:17px}
+  @keyframes drop{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .snackbar{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));z-index:70;
+    max-width:var(--maxw);margin:0 auto;background:var(--ink);color:var(--bg);border-radius:12px;
+    padding:11px 12px 11px 15px;display:flex;align-items:center;gap:10px;transform:translateY(160%);
+    transition:transform .2s;box-shadow:0 8px 24px rgba(0,0,0,.3);margin-left:12px;margin-right:12px}
+  .snackbar.on{transform:translateY(0)}
+  .snackbar .msg{flex:1;font-size:13px;font-weight:600}
+  .snackbar .undo{color:var(--orange);font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-size:12px;padding:6px 8px}
+
+  /* ---------- passcode gate ---------- */
+  .gate{position:fixed;inset:0;z-index:100;background:var(--ink);color:var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:30px}
+  .gate .mark{width:64px;height:64px;border:3px solid var(--orange);border-radius:15px;display:grid;place-items:center;background:#0c0b0a}
+  .gate .mark span{display:flex;gap:3px}
+  .gate .mark i{display:block;width:3px;height:30px;background:var(--orange)}
+  .gate .mark i:nth-child(2){height:22px}.gate .mark i:nth-child(3){width:5px}.gate .mark i:nth-child(4){height:18px}
+  .gate h1{font-size:24px;font-weight:800;letter-spacing:.05em;margin:0}
+  .gate p{color:#b8b1a6;font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;margin:-8px 0 0}
+  .gate .pin{display:flex;gap:9px}
+  .gate .pin input{width:200px;text-align:center;letter-spacing:.5em;font-size:22px;font-family:"IBM Plex Mono",monospace;
+    background:#0c0b0a;border:2px solid #4a443c;border-radius:12px;color:var(--bg);padding:13px;outline:none;font-weight:600}
+  .gate.bad .pin input{border-color:var(--warn);animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
+  .gate .err{color:#ffb4a1;font-size:12px;font-weight:700;height:16px}
+</style>
+</head>
+<body>
+
+<!-- ============ PASSCODE GATE (B) ============ -->
+<div class="gate" id="gate">
+  <div class="mark"><span><i></i><i></i><i></i><i></i></span></div>
+  <div style="text-align:center">
+    <h1>STOCKSCAN</h1><p data-t="appTitle">Inventory Control</p>
+  </div>
+  <form class="pin" id="pinForm">
+    <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+           autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="32"
+           placeholder="• • • • • • • • •" aria-label="passcode" data-tph="enterPasscode" />
+  </form>
+  <div class="err" id="pinErr"></div>
+  <button class="btn primary sm" id="pinGo" form="pinForm" data-t="unlock">Unlock</button>
+</div>
+
+<!-- ============ APP ============ -->
+<div class="app hide" id="app">
+  <header>
+    <div class="logo" id="logo">
+      <div class="mark"><span><i></i><i></i><i></i><i></i><i></i></span></div>
+      <div><h1 data-t="brand">StockScan</h1><small data-t="appTitle">Inventory Control</small></div>
+    </div>
+    <div class="spacer"></div>
+    <span class="net" id="net"></span>
+    <div class="lang">
+      <button data-lang="en">EN</button>
+      <button data-lang="th">ไทย</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="k" data-t="products">Products</div><div class="v" id="stProducts">0</div></div>
+    <div class="stat"><div class="k" data-t="totalUnits">Total Units</div><div class="v mono" id="stUnits">0</div></div>
+    <div class="stat warnv"><div class="k" data-t="inventoryValue">Inventory Value</div><div class="v mono" id="stValue">฿0</div></div>
+  </div>
+
+  <nav class="tabs">
+    <button data-tab="inv" class="on" data-t="inventory">Inventory</button>
+    <button data-tab="scan" data-t="scan">Scan</button>
+  </nav>
+
+  <main>
+    <!-- INVENTORY VIEW -->
+    <section class="view on" id="view-inv">
+      <div class="toolbar">
+        <label class="search">
+          <span class="mono" style="color:var(--muted)">⌕</span>
+          <input id="search" type="search" placeholder="Search…" data-tph="searchPh" />
+        </label>
+        <button class="chip" id="lowChip"><span class="dot"></span><span data-t="lowStockShort">Low</span></button>
+      </div>
+      <div class="list" id="list"></div>
+      <div style="height:14px"></div>
+      <button class="btn primary block" id="addBtn">+ <span data-t="add">Add</span></button>
+      <div class="section-h" data-t="dataIO">Data</div>
+      <div class="row">
+        <button class="btn sm" id="expProd" data-t="exportProducts">Export products</button>
+        <button class="btn sm" id="impProd" data-t="importProducts">Import products</button>
+      </div>
+      <div style="height:8px"></div>
+      <div class="row">
+        <button class="btn sm" id="expUnits" data-t="exportUnits">Export units</button>
+        <button class="btn sm" id="impUnits" data-t="importUnits">Import units</button>
+      </div>
+      <input type="file" id="fileProd" accept=".csv,text/csv" class="hide" />
+      <input type="file" id="fileUnits" accept=".csv,text/csv" class="hide" />
+    </section>
+
+    <!-- SCAN VIEW -->
+    <section class="view" id="view-scan">
+      <div class="scanwrap" id="scanwrap">
+        <video id="video" playsinline muted></video>
+        <div class="reticle"><div class="laser"></div></div>
+        <div class="scan-ph" id="scanPh">
+          <div class="mk">⊞</div>
+          <div data-t="cameraPrompt">Enable the camera to scan barcodes & serials.</div>
+        </div>
+      </div>
+
+      <div class="modeswitch" id="modeSwitch">
+        <button data-m="in" class="on" data-t="checkIn">Check-in</button>
+        <button data-m="out" data-t="checkOut">Check-out</button>
+      </div>
+
+      <div class="shelf-line">
+        <label data-t="sessionShelf">Shelf · this session</label>
+        <input id="shelfInput" list="shelfList" inputmode="text" autocomplete="off"
+               placeholder="Shelf / bin — optional" data-tph="shelfPh" />
+        <datalist id="shelfList"></datalist>
+      </div>
+
+      <div class="toggle-line" id="contLine">
+        <div class="lbl"><span data-t="continuousScan">Continuous scan</span>
+          <small data-t="continuousHint">Hands-free — applies the mode per scan</small></div>
+        <div class="sw" id="contSw"></div>
+      </div>
+
+      <button class="btn dark block" id="camBtn" data-t="enableCamera">Enable Camera</button>
+
+      <div class="manual">
+        <input id="manualCode" inputmode="text" placeholder="Manual barcode…" data-tph="manualPh" />
+        <button class="btn primary" id="manualGo" data-t="enter">Enter</button>
+      </div>
+
+      <div class="scan-readout">
+        <div class="k" data-t="lastScan">Last scan</div>
+        <div class="v" id="lastScan">—</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ SHEET / MODAL ============ -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="grip"></div><div id="sheetBody"></div></div>
+
+<!-- ============ TOASTS + SNACKBAR ============ -->
+<div class="toasts" id="toasts"></div>
+<div class="snackbar" id="snackbar"><div class="msg" id="snackMsg"></div><button class="undo" id="snackUndo" data-t="undo">Undo</button></div>
+
+<script type="module">
+/* ============================================================================
+   STOCKSCAN — single-file inventory app (vanilla, no build step)
+   Sections: CONFIG · i18n · state · supabase · offline queue · render ·
+             scanning · check-in/out · sheets · CSV · passcode · PWA
+   ============================================================================ */
+
+/* ───────────────────────── CONFIG ─────────────────────────
+   Paste your Supabase project URL + anon (publishable) key below.
+   Leave the placeholders to run fully LOCAL (localStorage only). */
+const SUPABASE_URL      = "https://dvwczrukbfzmcrijrcos.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_26bfcqsLcnCYLYO3ac1lzw_td_w_eSt";
+const APP_PASSCODE      = "212224236";     // shared device passcode
+const DEFAULT_LANG      = "th";            // "th" or "en"
+const CURRENCY          = "฿";
+const SCAN_COOLDOWN_MS  = 1500;            // min time before the SAME code counts again
+const FRAME_CLEAR_MS    = 800;             // empty frame this long => item left, may recount
+
+/* ───────────────────────── i18n (J) ───────────────────────── */
+const I18N = {
+  en:{
+    brand:"StockScan", appTitle:"Inventory Control", products:"Products", totalUnits:"Total Units",
+    inventoryValue:"Inventory Value", lowStock:"Low Stock", lowStockShort:"Low", onHand:"On hand",
+    inventory:"Inventory", scan:"Scan", add:"Add", checkIn:"Check-in", checkOut:"Check-out",
+    continuousScan:"Continuous scan", continuousHint:"Hands-free — applies the mode per scan",
+    serial:"Serial", tracking:"Tracking", quantity:"Quantity", serialized:"Serialized",
+    alreadyInStock:"Already in stock", notFound:"Not found", undo:"Undo",
+    showLowOnly:"Show low stock only", enterPasscode:"Enter passcode", set:"Set",
+    editDetails:"Edit details", delete:"Delete", unitCost:"Unit cost", lowStockAt:"Low-stock at",
+    location:"Location", scanOrConfirmSerial:"Scan or confirm serial",
+    enableCamera:"Enable Camera", disableCamera:"Stop Camera", cameraPrompt:"Enable the camera to scan barcodes & serials.",
+    searchPh:"Search name, code, location…", manualPh:"Manual barcode…", enter:"Enter",
+    lastScan:"Last scan", name:"Name", code:"Code", save:"Save", cancel:"Cancel", close:"Close",
+    addProduct:"Add product", editProduct:"Edit product", namePh:"Product name", newProduct:"New product", skip:"Skip",
+    inStockSerials:"In-stock serials", recentActivity:"Recent activity", value:"Line value",
+    noProducts:"No products yet. Scan or tap Add.", noMatches:"No matching products.",
+    exportProducts:"Export products", importProducts:"Import products",
+    exportUnits:"Export units", importUnits:"Import units", dataIO:"Data",
+    unlock:"Unlock", wrongPasscode:"Wrong passcode", locked:"Locked",
+    cameraDenied:"Camera blocked. Allow access in your browser settings, or use manual entry.",
+    cameraError:"Could not start camera. Use manual entry below.",
+    checkedIn:"checked in", checkedOut:"checked out", onHandShort:"on hand",
+    notInStock:"Not in stock", addFirst:"Unknown code — add the product first?",
+    serialNeeded:"Serial required", serialPrompt:"No serial detected. Scan again or type it:",
+    confirm:"Confirm", deleteConfirm:"Delete this product (and its units)?", deleted:"Deleted",
+    added:"Added", localOnly:"Local", online:"Live", offline:"Offline",
+    setQty:"Set quantity", tapSerialToOut:"Tap a serial to check it out.",
+    pcs:"pcs", none:"—", history:"History", noHistory:"No activity yet.",
+    qtyEmpty:"Already at zero", queued:"saved offline — will sync",
+    sessionShelf:"Shelf · this session", shelfPh:"Shelf / bin — optional"
+  },
+  th:{
+    brand:"StockScan", appTitle:"ระบบจัดการสต๊อก", products:"สินค้า", totalUnits:"จำนวนรวม",
+    inventoryValue:"มูลค่าสต๊อก", lowStock:"สต๊อกต่ำ", lowStockShort:"ต่ำ", onHand:"คงเหลือ",
+    inventory:"คลังสินค้า", scan:"สแกน", add:"เพิ่ม", checkIn:"รับเข้า", checkOut:"จ่ายออก",
+    continuousScan:"สแกนต่อเนื่อง", continuousHint:"แฮนด์ฟรี — ทำตามโหมดทุกครั้งที่สแกน",
+    serial:"ซีเรียล", tracking:"ประเภทการนับ", quantity:"ตามจำนวน", serialized:"ตามซีเรียล",
+    alreadyInStock:"มีอยู่ในสต๊อกแล้ว", notFound:"ไม่พบรายการ", undo:"เลิกทำ",
+    showLowOnly:"แสดงเฉพาะสต๊อกต่ำ", enterPasscode:"กรอกรหัสผ่าน", set:"ตั้งค่า",
+    editDetails:"แก้ไขข้อมูล", delete:"ลบ", unitCost:"ต้นทุนต่อหน่วย", lowStockAt:"แจ้งเตือนเมื่อต่ำกว่า",
+    location:"ที่เก็บ", scanOrConfirmSerial:"สแกนหรือยืนยันซีเรียล",
+    enableCamera:"เปิดกล้อง", disableCamera:"ปิดกล้อง", cameraPrompt:"เปิดกล้องเพื่อสแกนบาร์โค้ดและซีเรียล",
+    searchPh:"ค้นหาชื่อ รหัส ที่เก็บ…", manualPh:"กรอกบาร์โค้ด…", enter:"ตกลง",
+    lastScan:"สแกนล่าสุด", name:"ชื่อ", code:"รหัส", save:"บันทึก", cancel:"ยกเลิก", close:"ปิด",
+    addProduct:"เพิ่มสินค้า", editProduct:"แก้ไขสินค้า", namePh:"ชื่อสินค้า", newProduct:"สินค้าใหม่", skip:"ข้าม",
+    inStockSerials:"ซีเรียลในสต๊อก", recentActivity:"ความเคลื่อนไหวล่าสุด", value:"มูลค่ารายการ",
+    noProducts:"ยังไม่มีสินค้า กดสแกนหรือเพิ่ม", noMatches:"ไม่พบสินค้าที่ค้นหา",
+    exportProducts:"ส่งออกสินค้า", importProducts:"นำเข้าสินค้า",
+    exportUnits:"ส่งออกซีเรียล", importUnits:"นำเข้าซีเรียล", dataIO:"ข้อมูล",
+    unlock:"ปลดล็อก", wrongPasscode:"รหัสผ่านไม่ถูกต้อง", locked:"ล็อกแล้ว",
+    cameraDenied:"กล้องถูกบล็อก อนุญาตในตั้งค่าเบราว์เซอร์ หรือกรอกรหัสเอง",
+    cameraError:"เปิดกล้องไม่ได้ ใช้การกรอกรหัสด้านล่าง",
+    checkedIn:"รับเข้าแล้ว", checkedOut:"จ่ายออกแล้ว", onHandShort:"คงเหลือ",
+    notInStock:"ไม่มีในสต๊อก", addFirst:"ไม่รู้จักรหัสนี้ เพิ่มสินค้าก่อนไหม?",
+    serialNeeded:"ต้องมีซีเรียล", serialPrompt:"ไม่พบซีเรียล สแกนใหม่หรือพิมพ์เอง:",
+    confirm:"ยืนยัน", deleteConfirm:"ลบสินค้านี้ (รวมซีเรียล) ?", deleted:"ลบแล้ว",
+    added:"เพิ่มแล้ว", localOnly:"ออฟไลน์", online:"เชื่อมต่อ", offline:"ออฟไลน์",
+    setQty:"ตั้งจำนวน", tapSerialToOut:"แตะซีเรียลเพื่อจ่ายออก",
+    pcs:"ชิ้น", none:"—", history:"ประวัติ", noHistory:"ยังไม่มีความเคลื่อนไหว",
+    qtyEmpty:"เป็นศูนย์อยู่แล้ว", queued:"บันทึกออฟไลน์ — จะซิงก์ภายหลัง",
+    sessionShelf:"ชั้นวาง · รอบนี้", shelfPh:"ชั้นวาง / ช่อง — ไม่บังคับ"
+  }
+};
+let lang = localStorage.getItem("ss_lang") || DEFAULT_LANG;
+const t = (k)=> (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k;
+const money = (n)=> CURRENCY + (Math.round((n||0)*100)/100).toLocaleString(undefined,{maximumFractionDigits:2});
+
+/* ───────────────────────── STATE ───────────────────────── */
+const state = {
+  products:new Map(),         // code -> {code,name,cost,min,loc,tracking,qty,updated_at}
+  units:new Map(),            // id   -> {id,code,serial,status,checked_in_at,checked_out_at,loc,updated_at}
+  mode:"in",                  // 'in' | 'out'
+  continuous:false,
+  shelf: sessionStorage.getItem("ss_shelf")||"",   // session shelf: stamped on every check-in
+  lowOnly: sessionStorage.getItem("ss_lowonly")==="1",
+  online: navigator.onLine,
+  queue: JSON.parse(localStorage.getItem("ss_queue")||"[]"),
+};
+
+/* effective on-hand (used everywhere: list, stats, low-stock, value) */
+function onHand(code){
+  const p = state.products.get(code); if(!p) return 0;
+  if(p.tracking==="serial") return [...state.units.values()].filter(u=>u.code===code && u.status==="in").length;
+  return p.qty||0;
+}
+const unitsOf = (code)=> [...state.units.values()].filter(u=>u.code===code);
+const findUnit = (code,serial)=> [...state.units.values()].find(u=>u.code===code && u.serial===serial);
+const nowISO = ()=> new Date().toISOString();
+const uuid = ()=> (crypto.randomUUID? crypto.randomUUID() : 'id-'+Date.now()+'-'+Math.random().toString(16).slice(2));
+
+/* ───────────────────────── SUPABASE (A) ───────────────────────── */
+const cloudConfigured = /^https:\/\//.test(SUPABASE_URL) && !SUPABASE_URL.includes("YOUR-") && !SUPABASE_ANON_KEY.includes("YOUR-");
+let sb = null;
+async function initCloud(){
+  if(!cloudConfigured) return;
+  try{
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime:{ params:{ eventsPerSecond:10 } } });
+  }catch(e){ console.warn("Supabase load failed, running local:", e); sb=null; }
+}
+
+async function pullAll(){
+  if(!sb) return;
+  try{
+    const [{data:prods,error:e1},{data:units,error:e2}] = await Promise.all([
+      sb.from("products").select("*"),
+      sb.from("units").select("*"),
+    ]);
+    if(e1||e2) throw (e1||e2);
+    state.products.clear(); (prods||[]).forEach(p=>state.products.set(p.code,p));
+    state.units.clear();    (units||[]).forEach(u=>state.units.set(u.id,u));
+    saveCache(); renderAll();
+  }catch(e){ console.warn("pullAll failed (using cache):", e); }
+}
+
+function subscribeRealtime(){
+  if(!sb) return;
+  sb.channel("ss-products").on("postgres_changes",{event:"*",schema:"public",table:"products"},(p)=>{
+    if(p.eventType==="DELETE"){ state.products.delete(p.old.code); }
+    else { const cur=state.products.get(p.new.code);
+      if(!cur || new Date(p.new.updated_at) >= new Date(cur.updated_at)) state.products.set(p.new.code,p.new); }
+    saveCache(); renderAll(); refreshOpenSheet();
+  }).subscribe();
+  sb.channel("ss-units").on("postgres_changes",{event:"*",schema:"public",table:"units"},(p)=>{
+    if(p.eventType==="DELETE"){ state.units.delete(p.old.id); }
+    else { const cur=state.units.get(p.new.id);
+      if(!cur || new Date(p.new.updated_at) >= new Date(cur.updated_at)) state.units.set(p.new.id,p.new); }
+    saveCache(); renderAll(); refreshOpenSheet();
+  }).subscribe();
+}
+
+/* ───────────────────────── OFFLINE QUEUE (A) ─────────────────────────
+   Every write updates local state first (optimistic), then tries Supabase.
+   On failure the op is queued and flushed on reconnect. Last-write-wins
+   via the updated_at column we stamp on each op. */
+function persistQueue(){ localStorage.setItem("ss_queue", JSON.stringify(state.queue)); }
+function enqueue(op){ state.queue.push(op); persistQueue(); }
+
+async function runOp(op){
+  if(!sb) throw new Error("no cloud");
+  if(op.kind==="upsertProduct"){ const{error}=await sb.from("products").upsert(op.row); if(error) throw error; }
+  else if(op.kind==="deleteProduct"){
+    const{error:e1}=await sb.from("units").delete().eq("code",op.code); if(e1) throw e1;
+    const{error:e2}=await sb.from("products").delete().eq("code",op.code); if(e2) throw e2;
+  }
+  else if(op.kind==="upsertUnit"){ const{error}=await sb.from("units").upsert(op.row); if(error) throw error; }
+  else if(op.kind==="deleteUnit"){ const{error}=await sb.from("units").delete().eq("id",op.id); if(error) throw error; }
+}
+
+async function push(op){
+  if(!sb){ return; }                 // local-only mode: nothing to sync
+  if(!state.online){ enqueue(op); return; }
+  try{ await runOp(op); }
+  catch(e){ console.warn("write failed, queued:", e); enqueue(op); setNet(); }
+}
+
+async function flushQueue(){
+  if(!sb || !state.online || !state.queue.length) return;
+  const pending=[...state.queue]; state.queue=[]; persistQueue();
+  for(const op of pending){
+    try{ await runOp(op); }
+    catch(e){ console.warn("flush failed, re-queue:", e); state.queue.push(op); }
+  }
+  persistQueue();
+  setNet();
+  if(!state.queue.length) toast(t("online"),"ok");
+}
+
+/* ───────────────────────── localStorage cache ───────────────────────── */
+function saveCache(){
+  localStorage.setItem("ss_products", JSON.stringify([...state.products.values()]));
+  localStorage.setItem("ss_units",    JSON.stringify([...state.units.values()]));
+}
+function loadCache(){
+  try{ JSON.parse(localStorage.getItem("ss_products")||"[]").forEach(p=>state.products.set(p.code,p)); }catch{}
+  try{ JSON.parse(localStorage.getItem("ss_units")||"[]").forEach(u=>state.units.set(u.id,u)); }catch{}
+}
+
+/* ───────────────────────── DOM helpers ───────────────────────── */
+const $ = (s)=>document.querySelector(s);
+const el = (tag,props={},...kids)=>{ const n=document.createElement(tag); Object.assign(n,props);
+  if(props.dataset) Object.assign(n.dataset,props.dataset);
+  kids.flat().forEach(k=>n.append(k?.nodeType?k:document.createTextNode(k))); return n; };
+
+/* ───────────────────────── i18n apply ───────────────────────── */
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(n=> n.textContent = t(n.dataset.t));
+  document.querySelectorAll("[data-tph]").forEach(n=> n.placeholder = t(n.dataset.tph));
+  document.querySelectorAll(".lang button").forEach(b=> b.classList.toggle("on", b.dataset.lang===lang));
+  setNet();
+}
+
+/* ───────────────────────── RENDER ───────────────────────── */
+function renderAll(){ renderStats(); renderList(); renderShelfList(); }
+
+/* autocomplete for the session-shelf field: distinct known locations */
+function renderShelfList(){
+  const dl=$("#shelfList"); if(!dl) return;
+  const locs=new Set();
+  state.products.forEach(p=>{ if(p.loc) locs.add(p.loc); });
+  state.units.forEach(u=>{ if(u.loc) locs.add(u.loc); });
+  dl.innerHTML=[...locs].sort().map(l=>`<option value="${String(l).replace(/"/g,"&quot;")}"></option>`).join("");
+}
+
+function renderStats(){
+  const codes=[...state.products.keys()];
+  let units=0, value=0;
+  codes.forEach(c=>{ const oh=onHand(c); units+=oh; value+=oh*(state.products.get(c).cost||0); });
+  $("#stProducts").textContent = codes.length;
+  $("#stUnits").textContent = units.toLocaleString();
+  $("#stValue").textContent = money(value);
+}
+
+function renderList(){
+  const q = ($("#search").value||"").trim().toLowerCase();
+  const list=$("#list"); list.innerHTML="";
+  let items=[...state.products.values()].sort((a,b)=>(a.name||a.code).localeCompare(b.name||b.code));
+  if(state.lowOnly) items=items.filter(p=> onHand(p.code) <= (p.min||0));
+  if(q) items=items.filter(p=> [p.name,p.code,p.loc].some(v=>(v||"").toLowerCase().includes(q)));
+
+  if(!items.length){
+    list.append(el("div",{className:"empty"}, state.products.size? t("noMatches") : t("noProducts")));
+    return;
+  }
+  for(const p of items){
+    const oh=onHand(p.code), low = oh <= (p.min||0);
+    const item=el("div",{className:"item"});
+    const body=el("div",{className:"body"});
+    const nm=el("div",{className:"nm"}, p.name||p.code);
+    if(p.tracking==="serial") nm.append(el("span",{className:"tag serial"}, t("serial")));
+    if(low) nm.append(el("span",{className:"badge-low"}, t("lowStock")));
+    const meta=el("div",{className:"meta"},
+      el("span",{className:"code"}, p.code),
+      p.loc? el("span",{}, "· "+p.loc) : "",
+      el("span",{}, "· "+money(p.cost||0)));
+    body.append(nm,meta);
+    const qty=el("div",{className:"qty"},
+      el("div",{className:"n"+(low?" low":"")}, String(oh)),
+      el("div",{className:"u"}, t("onHandShort")),
+      el("div",{className:"val"}, money(oh*(p.cost||0))));
+    item.append(body,qty);
+    item.addEventListener("click",()=>openSheet(p.code));
+    list.append(item);
+  }
+}
+
+/* update an open sheet after realtime/undo changes */
+let openSheetCode=null;
+function refreshOpenSheet(){ if(openSheetCode!=null && $("#sheet").classList.contains("on")) openSheet(openSheetCode,true); }
+
+/* ───────────────────────── FEEDBACK: toast / beep / vibrate ───────────────────────── */
+let audioCtx=null;
+function beep(kind){
+  try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    if(kind==="ok"){ o.type="square"; o.frequency.value=880; }
+    else if(kind==="warn"){ o.type="sawtooth"; o.frequency.value=220; }
+    else { o.type="triangle"; o.frequency.value=520; }
+    const tnow=audioCtx.currentTime; g.gain.setValueAtTime(.001,tnow);
+    g.gain.exponentialRampToValueAtTime(.25,tnow+.01);
+    g.gain.exponentialRampToValueAtTime(.001,tnow+(kind==="warn"?.28:.14));
+    o.start(tnow); o.stop(tnow+(kind==="warn"?.3:.16));
+  }catch{}
+}
+function vibrate(kind){ if(navigator.vibrate) navigator.vibrate(kind==="warn"?[60,40,60]:30); }
+function toast(msg,kind="ok"){
+  beep(kind); vibrate(kind);
+  const icon = kind==="warn"?"!":(kind==="err"?"✕":"✓");
+  const node=el("div",{className:"toast "+(kind==="ok"?"":kind)}, el("span",{className:"ic"},icon), el("span",{},msg));
+  $("#toasts").append(node);
+  setTimeout(()=>{ node.style.opacity="0"; node.style.transition="opacity .25s"; setTimeout(()=>node.remove(),260); }, 2200);
+}
+
+/* ───────────────────────── UNDO snackbar (H) ───────────────────────── */
+let undoTimer=null, undoFn=null;
+function showUndo(msg, fn){
+  undoFn=fn;
+  $("#snackMsg").textContent=msg;
+  $("#snackbar").classList.add("on");
+  clearTimeout(undoTimer);
+  undoTimer=setTimeout(hideUndo, 5000);
+}
+function hideUndo(){ $("#snackbar").classList.remove("on"); undoFn=null; clearTimeout(undoTimer); }
+$("#snackUndo").addEventListener("click",()=>{ const f=undoFn; hideUndo(); if(f) f(); });
+
+/* ───────────────────────── WRITES (optimistic) ───────────────────────── */
+function saveProductLocal(p){ p.updated_at=nowISO(); state.products.set(p.code,p); saveCache(); renderAll(); }
+function saveUnitLocal(u){ u.updated_at=nowISO(); state.units.set(u.id,u); saveCache(); renderAll(); }
+
+async function upsertProduct(p){ saveProductLocal(p); await push({kind:"upsertProduct", row:{...p}}); }
+async function deleteProduct(code){
+  const removedUnits=unitsOf(code);
+  state.products.delete(code); removedUnits.forEach(u=>state.units.delete(u.id));
+  saveCache(); renderAll();
+  await push({kind:"deleteProduct", code});
+}
+async function upsertUnit(u){ saveUnitLocal(u); await push({kind:"upsertUnit", row:{...u}}); }
+async function removeUnit(id){ state.units.delete(id); saveCache(); renderAll(); await push({kind:"deleteUnit", id}); }
+
+/* ───────────────────────── CHECK-IN / CHECK-OUT (D) ───────────────────────── */
+function applyQtyAction(p){
+  const before=p.qty||0;
+  if(state.mode==="out" && before<=0){ toast(t("qtyEmpty"),"warn"); return; }
+  const prev={...p};
+  const after = state.mode==="in" ? before+1 : before-1;
+  const np={...p, qty:after};
+  if(state.mode==="in" && state.shelf) np.loc=state.shelf;   // session shelf → product's current location
+  upsertProduct(np);
+  const oh=onHand(p.code);
+  const shelfTag = (state.mode==="in" && state.shelf) ? ` · ${state.shelf}` : "";
+  toast(`${p.name||p.code} · ${state.mode==="in"?t("checkIn"):t("checkOut")} → ${oh} ${t("onHandShort")}${shelfTag}`, "ok");
+  showUndo(`${p.name||p.code} ${state.mode==="in"?"+1":"−1"}`, ()=> upsertProduct(prev));
+  setLastScan(p.code, null);
+}
+
+function applySerialAction(p, serial){
+  const existing=findUnit(p.code, serial);
+  if(state.mode==="in"){
+    if(existing && existing.status==="in"){ toast(`${t("alreadyInStock")} · ${serial}`,"warn"); return; }
+    const prev = existing? {...existing} : null;
+    const loc = state.shelf || (existing && existing.loc) || null;   // session shelf → this unit's location
+    const u = existing? {...existing, status:"in", checked_in_at:nowISO(), loc} : {id:uuid(), code:p.code, serial, status:"in", checked_in_at:nowISO(), checked_out_at:null, loc};
+    upsertUnit(u);
+    toast(`SN ${serial} ${t("checkedIn")} → ${onHand(p.code)} ${t("onHandShort")}${state.shelf?` · ${state.shelf}`:""}`, "ok");
+    showUndo(`SN ${serial} ${t("checkedIn")}`, ()=>{ if(prev) upsertUnit(prev); else removeUnit(u.id); });
+  } else {
+    if(!existing || existing.status==="out"){ toast(`${t("notInStock")} · ${serial}`,"warn"); return; }
+    const prev={...existing};
+    upsertUnit({...existing, status:"out", checked_out_at:nowISO()});
+    toast(`SN ${serial} ${t("checkedOut")} → ${onHand(p.code)} ${t("onHandShort")}`, "ok");
+    showUndo(`SN ${serial} ${t("checkedOut")}`, ()=> upsertUnit(prev));
+  }
+  setLastScan(p.code, serial);
+}
+
+/* central scan handler — used by camera, manual entry, role assignment */
+function handleScan(productCode, serial){
+  const p = state.products.get(productCode);
+
+  // Continuous OFF (F): a scan is a LOOKUP → open the product sheet.
+  if(!state.continuous){
+    if(!p){ promptAddUnknown(productCode); return; }
+    openSheet(productCode);
+    setLastScan(productCode, serial);
+    return;
+  }
+
+  // Continuous ON (F): apply the current mode action, no sheet.
+  if(!p){
+    // Can't check OUT something that isn't in the catalog.
+    if(state.mode==="out"){ toast(`${t("notFound")} · ${productCode}`,"warn"); return; }
+    // Check-IN of an unknown barcode → auto-create the product, count it, confirm the name.
+    confirmNewProduct(productCode, serial); return;
+  }
+  if(p.tracking==="serial"){
+    if(!serial){ promptSerial(p); return; }       // (C) no serial detected → confirm/scan/type
+    applySerialAction(p, serial);
+  } else {
+    applyQtyAction(p);
+  }
+}
+
+function setLastScan(code, serial){
+  const p=state.products.get(code);
+  $("#lastScan").textContent = (p?(p.name||code):code) + (serial? `  ·  SN ${serial}`:"");
+}
+
+/* ───────────────────────── CAMERA + DUAL-CODE SCAN (C,E,F) ───────────────────────── */
+const FORMATS = ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","qr_code","data_matrix"];
+const PRODUCT_SYMBOLOGIES = ["ean_13","ean_8","upc_a","upc_e"]; // typical retail SKU barcodes
+let detector=null, stream=null, scanning=false, rafId=null, lastDetectAt=0;
+
+// dedupe bookkeeping (E)
+const dedupe = { acceptedKey:null, acceptedAt:0, frameClearedSince:true, emptyStart:0 };
+
+async function ensureDetector(){
+  if(detector) return detector;
+  let Cls = window.BarcodeDetector;
+  if(!Cls){ // polyfill for iPhone/Safari & others
+    const mod = await import("https://esm.sh/barcode-detector@2/pure");
+    Cls = mod.BarcodeDetector;
+  }
+  detector = new Cls({ formats: FORMATS });
+  return detector;
+}
+
+async function enableCamera(){
+  if(scanning){ stopCamera(); return; }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:"environment"} }, audio:false });
+    const v=$("#video"); v.srcObject=stream; await v.play();
+    await ensureDetector();
+    $("#scanwrap").classList.add("live"); $("#scanPh").classList.add("hide");
+    $("#camBtn").textContent=t("disableCamera");
+    scanning=true; dedupe.frameClearedSince=true; tick();
+  }catch(e){
+    const msg = (e && (e.name==="NotAllowedError"||e.name==="SecurityError")) ? t("cameraDenied") : t("cameraError");
+    toast(msg,"err"); console.warn("camera:", e);
+  }
+}
+function stopCamera(){
+  scanning=false; if(rafId) cancelAnimationFrame(rafId);
+  if(stream){ stream.getTracks().forEach(tr=>tr.stop()); stream=null; }
+  $("#scanwrap").classList.remove("live"); $("#scanPh").classList.remove("hide");
+  $("#camBtn").textContent=t("enableCamera");
+}
+
+async function tick(){
+  if(!scanning) return;
+  rafId=requestAnimationFrame(tick);
+  const now=performance.now();
+  if(now-lastDetectAt < 180) return;       // throttle detect() ~5–6 fps
+  lastDetectAt=now;
+  const v=$("#video"); if(!v||v.readyState<2) return;
+  let codes=[];
+  try{ codes = await detector.detect(v); }catch{ return; }
+
+  if(!codes.length){                        // empty frame → maybe item left
+    if(!dedupe.emptyStart) dedupe.emptyStart=now;
+    if(now-dedupe.emptyStart >= FRAME_CLEAR_MS) dedupe.frameClearedSince=true;
+    return;
+  }
+  dedupe.emptyStart=0;
+
+  const roles = assignRoles(codes); if(!roles) return;
+  const key = roles.serial? `${roles.productCode}|${roles.serial}` : roles.productCode;
+
+  // (E) accept rules: different key always; same key only after cooldown AND frame cleared since
+  const sameKey = key===dedupe.acceptedKey;
+  const cooledDown = now-dedupe.acceptedAt >= SCAN_COOLDOWN_MS;
+  if(sameKey && !(cooledDown && dedupe.frameClearedSince)) return;
+
+  dedupe.acceptedKey=key; dedupe.acceptedAt=now; dedupe.frameClearedSince=false;
+  handleScan(roles.productCode, roles.serial);
+}
+
+/* (C) Assign PRODUCT vs SERIAL from all codes in the frame.
+   ── Tweak this rule freely. Default precedence for the product code: ──
+     1) a code whose value already exists in the catalog
+     2) else a code using a product symbology (EAN/UPC)
+     3) else the topmost code (smallest boundingBox.y)
+   The remaining code (if any) becomes the serial. */
+function assignRoles(codes){
+  if(!codes.length) return null;
+  if(codes.length===1) return { productCode:codes[0].rawValue, serial:null };
+
+  let product = codes.find(c=> state.products.has(c.rawValue));
+  if(!product) product = codes.find(c=> PRODUCT_SYMBOLOGIES.includes(c.format));
+  if(!product) product = [...codes].sort((a,b)=> (a.boundingBox?.y??0)-(b.boundingBox?.y??0))[0];
+
+  const other = codes.find(c=> c!==product) || null;
+  return { productCode:product.rawValue, serial: other? other.rawValue : null };
+}
+
+/* ───────────────────────── PROMPTS (C,D) ───────────────────────── */
+function promptSerial(p){
+  // Serialized SKU but no serial code detected → scan again or type/confirm.
+  // OCR HOOK: optional Tesseract.js could pre-fill this input from a printed serial.
+  openModal(`<h2>${t("serialNeeded")}</h2>
+    <div class="sub">${p.name||p.code} · ${p.code}</div>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 12px">${t("serialPrompt")}</p>
+    <div class="field"><label>${t("scanOrConfirmSerial")}</label>
+      <input id="snInput" inputmode="text" autofocus placeholder="SN…" /></div>
+    <div class="row"><button class="btn" id="snCancel">${t("cancel")}</button>
+      <button class="btn primary" id="snOk">${t("confirm")}</button></div>`);
+  $("#snInput").focus();
+  $("#snCancel").onclick=closeSheet;
+  $("#snOk").onclick=()=>{ const sn=$("#snInput").value.trim(); if(!sn) return; closeSheet(); applySerialAction(p, sn); };
+  $("#snInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#snOk").click(); }});
+}
+
+function promptAddUnknown(code, serial=null){
+  openProductForm({ code, name:"", cost:0, min:0, loc:"", tracking: serial? "serial":"quantity", qty:0 }, true, serial);
+}
+
+/* (Auto-create then confirm) Unknown barcode scanned at CHECK-IN:
+   create the product on the fly, count the scan immediately (keeps scanning fast),
+   then offer a quick name edit. Name source is your product master (CSV import);
+   until named, the barcode itself is the placeholder name. A scanned serial makes
+   it serialized so the S/N is filed as a sub-item under this product/barcode. */
+function confirmNewProduct(code, serial){
+  const tracking = serial ? "serial" : "quantity";
+  upsertProduct({ code, name:code, cost:0, min:0, loc:"", tracking, qty:0 });
+  const p = state.products.get(code);
+  if(tracking==="serial") applySerialAction(p, serial);   // mode is 'in' on this path
+  else applyQtyAction(p);
+  hideUndo();   // the name confirm below is the primary interaction here
+  openModal(`<h2>${t("newProduct")}</h2>
+    <div class="sub"><span>${code}</span>
+      <span class="tag ${tracking==='serial'?'serial':''}">${tracking==='serial'?t('serialized'):t('quantity')}</span>
+      ${serial?`<span>· SN ${serial}</span>`:""}${state.shelf?`<span>· ${state.shelf}</span>`:""}</div>
+    <div class="field"><label>${t('name')}</label>
+      <input id="npName" inputmode="text" value="${code}" placeholder="${t('namePh')}" /></div>
+    <div class="row"><button class="btn" id="npSkip">${t('skip')}</button>
+      <button class="btn primary" id="npSave">${t('save')}</button></div>`);
+  $("#npName").focus(); $("#npName").select();
+  $("#npSkip").onclick=closeSheet;
+  $("#npSave").onclick=()=>{ const nm=$("#npName").value.trim()||code; upsertProduct({...state.products.get(code), name:nm}); closeSheet(); };
+  $("#npName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#npSave").click(); }});
+}
+
+/* ───────────────────────── PRODUCT SHEET (G) ───────────────────────── */
+function openModal(html){ $("#sheetBody").innerHTML=html; $("#scrim").classList.add("on"); $("#sheet").classList.add("on"); }
+function closeSheet(){ $("#sheet").classList.remove("on"); $("#scrim").classList.remove("on"); openSheetCode=null; }
+$("#scrim").addEventListener("click",closeSheet);
+
+function fmtTime(iso){ if(!iso) return ""; const d=new Date(iso);
+  return d.toLocaleString(lang==="th"?"th-TH":"en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}); }
+
+function openSheet(code, keepScroll=false){
+  const p=state.products.get(code); if(!p){ promptAddUnknown(code); return; }
+  openSheetCode=code;
+  const oh=onHand(code), val=oh*(p.cost||0), low=oh<=(p.min||0);
+  const head = `<h2>${p.name||p.code}</h2>
+    <div class="sub"><span>${p.code}</span>
+      <span class="tag ${p.tracking==='serial'?'serial':''}">${p.tracking==='serial'?t('serialized'):t('quantity')}</span>
+      ${p.loc?`<span>· ${p.loc}</span>`:""}${low?`<span class="badge-low">${t('lowStock')}</span>`:""}</div>`;
+
+  if(p.tracking==="serial"){
+    const ins = unitsOf(code).filter(u=>u.status==="in").sort((a,b)=>(b.checked_in_at||"").localeCompare(a.checked_in_at||""));
+    const hist = unitsOf(code).map(u=>({serial:u.serial, status:u.status, when:u.status==="in"?u.checked_in_at:u.checked_out_at}))
+      .filter(h=>h.when).sort((a,b)=>(b.when||"").localeCompare(a.when||"")).slice(0,8);
+    openModal(`${head}
+      <div class="qtybig"><div class="num">${oh}<small>${t("onHand")}</small></div></div>
+      <div class="valueline"><span>${t("value")}</span><span>${money(val)}</span></div>
+      <div class="section-h">${t("inStockSerials")}</div>
+      <div class="serlist" id="serlist">${ ins.length? ins.map(u=>`
+        <div class="sr"><span class="s">${u.serial}</span><span class="t">${u.loc?u.loc+" · ":""}${fmtTime(u.checked_in_at)}</span>
+          <button class="btn sm" data-out="${u.serial}">${t("checkOut")}</button></div>`).join("")
+        : `<div class="empty" style="padding:14px">${t("none")}</div>` }
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px">${t("tapSerialToOut")}</div>
+      <div class="section-h">${t("recentActivity")}</div>
+      <div class="hist">${ hist.length? hist.map(h=>`
+        <div class="h"><span class="pill ${h.status}">${h.status==="in"?t("checkIn"):t("checkOut")}</span>
+          <span class="sn">${h.serial}</span><span class="when">${fmtTime(h.when)}</span></div>`).join("")
+        : `<div class="empty" style="padding:10px">${t("noHistory")}</div>` }</div>
+      <div style="height:14px"></div>
+      <div class="row"><button class="btn" id="editBtn">${t("editDetails")}</button>
+        <button class="btn" id="delBtn" style="color:var(--warn)">${t("delete")}</button></div>`);
+    $("#serlist").querySelectorAll("[data-out]").forEach(b=> b.onclick=()=>{
+      const prevMode=state.mode; state.mode="out"; applySerialAction(p, b.dataset.out); state.mode=prevMode; openSheet(code);
+    });
+  } else {
+    openModal(`${head}
+      <div class="qtybig">
+        <button id="dec">−</button>
+        <div class="num" id="qtyNum">${p.qty||0}<small>${t("onHand")}</small></div>
+        <button class="primary" id="inc">+</button>
+      </div>
+      <div class="valueline"><span>${t("value")}</span><span id="lineVal">${money(val)}</span></div>
+      <div class="field"><label>${t("setQty")}</label>
+        <div class="two"><input id="setQ" type="number" inputmode="numeric" value="${p.qty||0}" />
+          <button class="btn dark" id="setBtn">${t("set")}</button></div></div>
+      <div class="row"><button class="btn" id="editBtn">${t("editDetails")}</button>
+        <button class="btn" id="delBtn" style="color:var(--warn)">${t("delete")}</button></div>`);
+    const refresh=()=>{ const cur=state.products.get(code); $("#qtyNum").firstChild.textContent=cur.qty||0;
+      $("#lineVal").textContent=money((cur.qty||0)*(cur.cost||0)); renderAll(); };
+    $("#inc").onclick=()=>{ const cur=state.products.get(code); const before=cur.qty||0;
+      upsertProduct({...cur, qty:before+1}); refresh(); showUndo(`${cur.name||code} +1`, ()=>{upsertProduct({...state.products.get(code),qty:before}); refresh();}); };
+    $("#dec").onclick=()=>{ const cur=state.products.get(code); const before=cur.qty||0; if(before<=0){toast(t("qtyEmpty"),"warn");return;}
+      upsertProduct({...cur, qty:before-1}); refresh(); showUndo(`${cur.name||code} −1`, ()=>{upsertProduct({...state.products.get(code),qty:before}); refresh();}); };
+    $("#setBtn").onclick=()=>{ const cur=state.products.get(code); const before=cur.qty||0; const nv=Math.max(0,parseInt($("#setQ").value||"0",10));
+      upsertProduct({...cur, qty:nv}); refresh(); showUndo(`${cur.name||code} → ${nv}`, ()=>{upsertProduct({...state.products.get(code),qty:before}); refresh();}); };
+  }
+
+  $("#editBtn").onclick=()=>openProductForm(state.products.get(code), false);
+  $("#delBtn").onclick=()=>{
+    if(!confirm(t("deleteConfirm"))) return;
+    const snapshot={...p}, unitSnap=unitsOf(code).map(u=>({...u}));
+    deleteProduct(code); closeSheet(); toast(t("deleted"),"warn");
+    showUndo(`${p.name||code} ${t("deleted")}`, ()=>{ upsertProduct(snapshot); unitSnap.forEach(u=>upsertUnit(u)); });
+  };
+}
+
+/* ───────────────────────── ADD / EDIT FORM (G) ───────────────────────── */
+function openProductForm(p, isNew, pendingSerial=null){
+  openModal(`<h2>${isNew?t("addProduct"):t("editProduct")}</h2>
+    <div class="field"><label>${t("code")}</label>
+      <input id="fCode" inputmode="text" value="${p.code||""}" ${isNew?"":"disabled"} placeholder="SKU / barcode" /></div>
+    <div class="field"><label>${t("name")}</label>
+      <input id="fName" value="${p.name||""}" placeholder="${t("namePh")}" /></div>
+    <div class="field"><label>${t("tracking")}</label>
+      <div class="seg" id="fTrack">
+        <button type="button" data-v="quantity" class="${p.tracking!=='serial'?'on':''}">${t("quantity")}</button>
+        <button type="button" data-v="serial" class="${p.tracking==='serial'?'on':''}">${t("serialized")}</button>
+      </div></div>
+    <div class="field" id="qtyField"><label>${t("onHand")}</label>
+      <input id="fQty" type="number" inputmode="numeric" value="${p.qty||0}" /></div>
+    <div class="field two"><div><label>${t("unitCost")} (${CURRENCY})</label>
+        <input id="fCost" type="number" inputmode="decimal" value="${p.cost||0}" /></div>
+      <div><label>${t("lowStockAt")}</label><input id="fMin" type="number" inputmode="numeric" value="${p.min||0}" /></div></div>
+    <div class="field"><label>${t("location")}</label>
+      <input id="fLoc" value="${p.loc||""}" placeholder="A-12 / shelf 3…" /></div>
+    <div class="row"><button class="btn" id="fCancel">${t("cancel")}</button>
+      <button class="btn primary" id="fSave">${t("save")}</button></div>`);
+
+  let track = p.tracking==="serial"?"serial":"quantity";
+  const syncTrack=()=>{ $("#qtyField").style.display = track==="serial"?"none":"block"; };
+  syncTrack();
+  $("#fTrack").querySelectorAll("button").forEach(b=> b.onclick=()=>{
+    track=b.dataset.v; $("#fTrack").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); syncTrack();
+  });
+  $("#fCancel").onclick=closeSheet;
+  $("#fSave").onclick=()=>{
+    const code=($("#fCode").value||p.code||"").trim(); if(!code){ toast(t("code"),"err"); return; }
+    const np={ code, name:$("#fName").value.trim()||code,
+      cost:parseFloat($("#fCost").value)||0, min:parseInt($("#fMin").value||"0",10)||0,
+      loc:$("#fLoc").value.trim(), tracking:track,
+      qty: track==="serial" ? (state.products.get(code)?.qty||0) : (parseInt($("#fQty").value||"0",10)||0) };
+    upsertProduct(np);
+    closeSheet();
+    toast(isNew?t("added"):t("save"),"ok");
+    // If a serial was waiting (scanned serialized item that wasn't in catalog), check it in now.
+    if(pendingSerial && track==="serial"){ const prevMode=state.mode; state.mode="in"; applySerialAction(np, pendingSerial); state.mode=prevMode; }
+    else openSheet(code);
+  };
+}
+
+/* ───────────────────────── CSV (products + units) ───────────────────────── */
+function csvEscape(v){ v=(v==null?"":String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+function toCSV(rows){ return rows.map(r=>r.map(csvEscape).join(",")).join("\r\n"); }
+function parseCSV(text){
+  const rows=[]; let row=[], cur="", q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else { if(c==='"') q=true; else if(c===","){ row.push(cur); cur=""; }
+      else if(c==="\n"){ row.push(cur); rows.push(row); row=[]; cur=""; }
+      else if(c==="\r"){} else cur+=c; } }
+  if(cur.length||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=> r.length && r.some(x=>x!==""));
+}
+function download(name, text){
+  const blob=new Blob([text],{type:"text/csv;charset=utf-8"});
+  const a=el("a",{href:URL.createObjectURL(blob), download:name}); document.body.append(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500);
+}
+function exportProducts(){
+  const head=["code","name","cost","min","loc","tracking","qty"];
+  const rows=[head, ...[...state.products.values()].map(p=>[p.code,p.name,p.cost,p.min,p.loc,p.tracking||"quantity",p.qty||0])];
+  download("stockscan-products.csv", toCSV(rows));
+}
+function exportUnits(){
+  const head=["code","serial","status","loc"];
+  const rows=[head, ...[...state.units.values()].map(u=>[u.code,u.serial,u.status,u.loc||""])];
+  download("stockscan-units.csv", toCSV(rows));
+}
+function importProducts(text){
+  const rows=parseCSV(text); if(!rows.length) return; const head=rows[0].map(h=>h.trim().toLowerCase());
+  const ix=(k)=>head.indexOf(k);
+  let n=0;
+  for(let i=1;i<rows.length;i++){ const r=rows[i]; const code=(r[ix("code")]||"").trim(); if(!code) continue;
+    const tracking=(r[ix("tracking")]||"quantity").trim()==="serial"?"serial":"quantity";
+    upsertProduct({ code, name:(r[ix("name")]||code).trim(),
+      cost:parseFloat(r[ix("cost")])||0, min:parseInt(r[ix("min")]||"0",10)||0,
+      loc:(r[ix("loc")]||"").trim(), tracking, qty: tracking==="serial"?0:(parseInt(r[ix("qty")]||"0",10)||0) }); n++; }
+  toast(`${t("importProducts")}: ${n}`,"ok");
+}
+function importUnits(text){
+  const rows=parseCSV(text); if(!rows.length) return; const head=rows[0].map(h=>h.trim().toLowerCase());
+  const ix=(k)=>head.indexOf(k); let n=0;
+  for(let i=1;i<rows.length;i++){ const r=rows[i]; const code=(r[ix("code")]||"").trim(); const serial=(r[ix("serial")]||"").trim();
+    if(!code||!serial) continue;
+    const status=(r[ix("status")]||"in").trim()==="out"?"out":"in";
+    const loc=(ix("loc")>=0?(r[ix("loc")]||""):"").trim()||null;
+    const existing=findUnit(code,serial);
+    const u = existing? {...existing,status,loc:loc||existing.loc||null} : {id:uuid(),code,serial,status,checked_in_at:status==="in"?nowISO():null,checked_out_at:status==="out"?nowISO():null,loc};
+    upsertUnit(u); n++; }
+  toast(`${t("importUnits")}: ${n}`,"ok");
+}
+
+/* ───────────────────────── PASSCODE GATE (B) ───────────────────────── */
+function isUnlocked(){ return localStorage.getItem("ss_unlocked")==="1"; }
+function unlock(){ localStorage.setItem("ss_unlocked","1"); $("#gate").classList.add("hide"); $("#app").classList.remove("hide"); }
+function lock(){ localStorage.removeItem("ss_unlocked"); location.reload(); }
+$("#pinForm").addEventListener("submit",(e)=>{
+  e.preventDefault();
+  if($("#pinInput").value===APP_PASSCODE){ unlock(); }
+  else { $("#gate").classList.add("bad"); $("#pinErr").textContent=t("wrongPasscode");
+    setTimeout(()=>$("#gate").classList.remove("bad"),450); $("#pinInput").value=""; }
+});
+// discreet Lock: long-press the logo
+let lpTimer=null;
+const startLP=()=>{ lpTimer=setTimeout(()=>{ if(confirm(t("locked")+"?")) lock(); }, 650); };
+const cancelLP=()=>clearTimeout(lpTimer);
+["mousedown","touchstart"].forEach(ev=>$("#logo").addEventListener(ev,startLP));
+["mouseup","mouseleave","touchend","touchcancel"].forEach(ev=>$("#logo").addEventListener(ev,cancelLP));
+
+/* ───────────────────────── NET status ───────────────────────── */
+function setNet(){
+  const n=$("#net");
+  if(!cloudConfigured){ n.className="net local"; n.textContent=t("localOnly"); return; }
+  if(state.online){ n.className="net online"; n.textContent=t("online")+(state.queue.length?` ⟳${state.queue.length}`:""); }
+  else { n.className="net offline"; n.textContent=t("offline")+(state.queue.length?` ⟳${state.queue.length}`:""); }
+}
+window.addEventListener("online", ()=>{ state.online=true; setNet(); flushQueue(); });
+window.addEventListener("offline",()=>{ state.online=false; setNet(); });
+
+/* ───────────────────────── WIRING ───────────────────────── */
+// tabs
+document.querySelectorAll("nav.tabs button").forEach(b=> b.onclick=()=>{
+  document.querySelectorAll("nav.tabs button").forEach(x=>x.classList.toggle("on",x===b));
+  $("#view-inv").classList.toggle("on", b.dataset.tab==="inv");
+  $("#view-scan").classList.toggle("on", b.dataset.tab==="scan");
+});
+// language
+document.querySelectorAll(".lang button").forEach(b=> b.onclick=()=>{ lang=b.dataset.lang; localStorage.setItem("ss_lang",lang); applyLang(); renderAll(); });
+// search + low filter
+$("#search").addEventListener("input", renderList);
+$("#lowChip").onclick=()=>{ state.lowOnly=!state.lowOnly; sessionStorage.setItem("ss_lowonly", state.lowOnly?"1":"0");
+  $("#lowChip").classList.toggle("on", state.lowOnly); renderList(); };
+// add
+$("#addBtn").onclick=()=>openProductForm({code:"",name:"",cost:0,min:0,loc:"",tracking:"quantity",qty:0}, true);
+// mode + continuous
+$("#modeSwitch").querySelectorAll("button").forEach(b=> b.onclick=()=>{ state.mode=b.dataset.m;
+  $("#modeSwitch").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); });
+$("#contSw").onclick=()=>{ state.continuous=!state.continuous; $("#contSw").classList.toggle("on",state.continuous); };
+// session shelf
+$("#shelfInput").value = state.shelf;
+$("#shelfInput").addEventListener("input", ()=>{ state.shelf=$("#shelfInput").value.trim(); sessionStorage.setItem("ss_shelf", state.shelf); });
+// camera + manual
+$("#camBtn").onclick=enableCamera;
+$("#manualGo").onclick=()=>{ const v=$("#manualCode").value.trim(); if(!v) return; $("#manualCode").value=""; handleScan(v, null); };
+$("#manualCode").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#manualGo").click(); }});
+// CSV
+$("#expProd").onclick=exportProducts; $("#expUnits").onclick=exportUnits;
+$("#impProd").onclick=()=>$("#fileProd").click(); $("#impUnits").onclick=()=>$("#fileUnits").click();
+$("#fileProd").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>importProducts(r.result); r.readAsText(f); e.target.value=""; };
+$("#fileUnits").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>importUnits(r.result); r.readAsText(f); e.target.value=""; };
+// stop camera when leaving the page/tab
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && scanning) stopCamera(); });
+
+/* ───────────────────────── PWA (K) ───────────────────────── */
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load",()=> navigator.serviceWorker.register("./service-worker.js").catch(e=>console.warn("SW:",e)));
+}
+
+/* ───────────────────────── BOOT ───────────────────────── */
+async function boot(){
+  applyLang();
+  $("#modeSwitch").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===state.mode));
+  $("#lowChip").classList.toggle("on", state.lowOnly);
+  loadCache(); renderAll();          // offline-first: show last-known stock immediately
+  if(isUnlocked()){ $("#gate").classList.add("hide"); $("#app").classList.remove("hide"); }
+  else { $("#pinInput").focus(); }
+  await initCloud();
+  if(sb){ await pullAll(); subscribeRealtime(); flushQueue(); }
+  setNet();
+}
+boot();
+</script>
+</body>
+</html>
