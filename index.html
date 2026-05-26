@@ -54,6 +54,8 @@
   .lang{display:flex;border:1.5px solid #4a443c;border-radius:9px;overflow:hidden}
   .lang button{padding:6px 9px;font-size:11px;font-weight:700;color:#b8b1a6;letter-spacing:.04em}
   .lang button.on{background:var(--orange);color:#141210}
+  .iconbtn{display:grid;place-items:center;width:34px;height:34px;flex:0 0 auto;border:1.5px solid #4a443c;border-radius:9px;color:#b8b1a6;background:transparent}
+  .iconbtn:active{background:#4a443c;color:var(--bg)}
   .net{font-size:9px;letter-spacing:.1em;padding:3px 6px;border-radius:6px;font-weight:700;text-transform:uppercase}
   .net.online{background:#143; color:#7bf0a8}
   .net.offline{background:#411;color:#ffb4a1}
@@ -236,6 +238,32 @@
   .gate.bad .pin input{border-color:var(--warn);animation:shake .4s}
   @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
   .gate .err{color:#ffb4a1;font-size:12px;font-weight:700;height:16px}
+
+  /* ============================================================
+     DESKTOP (≥ 900px): two-pane dashboard.
+     Everything below is inside this media query, so the MOBILE
+     layout (< 900px) is left exactly as-is.
+     ============================================================ */
+  @media (min-width:900px){
+    html,body{height:100%}
+    .app{max-width:1180px;height:100vh;padding:0 20px}
+    nav.tabs{display:none}                         /* desktop shows both panels at once */
+    main{flex:1;min-height:0;display:grid;grid-template-columns:380px minmax(0,1fr);gap:20px;padding:18px 2px;align-items:stretch}
+    .view{display:flex !important;flex-direction:column;min-height:0;padding:0 4px;overflow:auto}
+    #view-scan{order:-1}                            /* scan panel on the left */
+    #view-scan .scan-readout{margin-top:auto}       /* push last-scan to the bottom of the panel */
+    #view-inv .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px;align-content:start}
+    #view-inv .item{align-items:flex-start}
+    /* product sheet / add-edit become a centered dialog instead of a bottom sheet */
+    .sheet{left:50%;right:auto;top:50%;bottom:auto;width:min(560px,92vw);max-width:none;margin:0;
+      border-radius:18px;border-bottom:2px solid var(--line);max-height:86vh;
+      transform:translate(-50%,-50%) scale(.96);opacity:0;visibility:hidden;transition:transform .2s,opacity .2s}
+    .sheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;visibility:visible}
+    .grip{display:none}
+    .toasts,.snackbar{max-width:560px}
+    /* a touch more polish on the wide camera column */
+    .scanwrap{max-height:60vh}
+  }
 </style>
 </head>
 <body>
@@ -271,6 +299,9 @@
       <button data-lang="en">EN</button>
       <button data-lang="th">ไทย</button>
     </div>
+    <button class="iconbtn" id="logoutBtn" aria-label="Log out" title="Log out">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
   </header>
 
   <div class="stats">
@@ -410,7 +441,7 @@ const I18N = {
     moveQtyLabel:"Quantity in / out", overDispatch:"Dispatch exceeds on-hand (set to 0)",
     lock:"Lock", lockedTag:"Locked", lockedNotice:"Locked — details can’t be edited (stock in/out still works)",
     lockAll:"Lock / Unlock all", lockedAll:"All products locked", unlockedAll:"All products unlocked",
-    unlock:"Unlock", wrongPasscode:"Wrong passcode", wrongLogin:"Wrong username or password", username:"Username", locked:"Locked",
+    unlock:"Unlock", wrongPasscode:"Wrong passcode", wrongLogin:"Wrong username or password", username:"Username", locked:"Locked", logout:"Log out",
     cameraDenied:"Camera blocked. Allow access in your browser settings, or use manual entry.",
     cameraError:"Could not start camera. Use manual entry below.",
     checkedIn:"checked in", checkedOut:"checked out", onHandShort:"on hand",
@@ -445,7 +476,7 @@ const I18N = {
     moveQtyLabel:"จำนวนที่รับเข้า / จ่ายออก", overDispatch:"จ่ายออกเกินจำนวนคงเหลือ (ตั้งเป็น 0)",
     lock:"ล็อก", lockedTag:"ล็อก", lockedNotice:"ล็อกอยู่ — แก้ไขข้อมูลไม่ได้ (ยังรับเข้า/จ่ายออกได้)",
     lockAll:"ล็อก/ปลดล็อกทั้งหมด", lockedAll:"ล็อกสินค้าทั้งหมดแล้ว", unlockedAll:"ปลดล็อกทั้งหมดแล้ว",
-    unlock:"ปลดล็อก", wrongPasscode:"รหัสผ่านไม่ถูกต้อง", wrongLogin:"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง", username:"ชื่อผู้ใช้", locked:"ล็อกแล้ว",
+    unlock:"ปลดล็อก", wrongPasscode:"รหัสผ่านไม่ถูกต้อง", wrongLogin:"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง", username:"ชื่อผู้ใช้", locked:"ล็อกแล้ว", logout:"ออกจากระบบ",
     cameraDenied:"กล้องถูกบล็อก อนุญาตในตั้งค่าเบราว์เซอร์ หรือกรอกรหัสเอง",
     cameraError:"เปิดกล้องไม่ได้ ใช้การกรอกรหัสด้านล่าง",
     checkedIn:"รับเข้าแล้ว", checkedOut:"จ่ายออกแล้ว", onHandShort:"คงเหลือ",
@@ -586,6 +617,7 @@ function applyLang(){
   document.querySelectorAll("[data-t]").forEach(n=> n.textContent = t(n.dataset.t));
   document.querySelectorAll("[data-tph]").forEach(n=> n.placeholder = t(n.dataset.tph));
   document.querySelectorAll(".lang button").forEach(b=> b.classList.toggle("on", b.dataset.lang===lang));
+  const lo=$("#logoutBtn"); if(lo){ lo.title=t("logout"); lo.setAttribute("aria-label",t("logout")); }
   setNet();
 }
 
@@ -1140,7 +1172,9 @@ $("#pinForm").addEventListener("submit",(e)=>{
   else { $("#gate").classList.add("bad"); $("#pinErr").textContent=t("wrongLogin");
     setTimeout(()=>$("#gate").classList.remove("bad"),450); $("#pinInput").value=""; }
 });
-// discreet Lock: long-press the logo
+// Log out button (clears the device unlock → back to the login gate)
+$("#logoutBtn").onclick=()=>{ if(confirm(t("logout")+"?")) lock(); };
+// discreet Lock: long-press the logo (kept as a shortcut)
 let lpTimer=null;
 const startLP=()=>{ lpTimer=setTimeout(()=>{ if(confirm(t("locked")+"?")) lock(); }, 650); };
 const cancelLP=()=>clearTimeout(lpTimer);
