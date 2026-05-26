@@ -197,6 +197,9 @@
   .hist .h .sn{font-family:"IBM Plex Mono",monospace;font-weight:600;flex:1;word-break:break-all}
   .hist .h .when{color:var(--muted);font-family:"IBM Plex Mono",monospace}
   .section-h{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin:14px 0 7px}
+  .locknote{font-size:11.5px;font-weight:700;color:var(--low);background:#fbf3e0;border:1.5px solid var(--low);border-radius:9px;padding:8px 11px;margin:10px 0 8px;text-align:center}
+  .btn:disabled{opacity:.4;pointer-events:none}
+  .tag.lock{background:#fbf3e0;color:var(--low);border-color:var(--low)}
 
   /* ---------- toast + snackbar ---------- */
   .toasts{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:0;right:0;z-index:80;
@@ -306,6 +309,8 @@
         <button class="btn sm" id="expUnits" data-t="exportUnits">Export units</button>
         <button class="btn sm" id="impUnits" data-t="importUnits">Import units</button>
       </div>
+      <div style="height:8px"></div>
+      <div class="row"><button class="btn sm" id="lockAllBtn" data-t="lockAll">Lock / Unlock all</button></div>
       <input type="file" id="fileProd" accept=".csv,text/csv" class="hide" />
       <input type="file" id="fileUnits" accept=".csv,text/csv" class="hide" />
     </section>
@@ -403,6 +408,8 @@ const I18N = {
     exportUnits:"Export units", importUnits:"Import units", dataIO:"Data",
     template:"Template", noCodeColumn:"No ‘code’ column found — use the Template", importedZero:"Imported 0 — check the file or use the Template",
     moveQtyLabel:"Quantity in / out", overDispatch:"Dispatch exceeds on-hand (set to 0)",
+    lock:"Lock", lockedTag:"Locked", lockedNotice:"Locked — details can’t be edited (stock in/out still works)",
+    lockAll:"Lock / Unlock all", lockedAll:"All products locked", unlockedAll:"All products unlocked",
     unlock:"Unlock", wrongPasscode:"Wrong passcode", wrongLogin:"Wrong username or password", username:"Username", locked:"Locked",
     cameraDenied:"Camera blocked. Allow access in your browser settings, or use manual entry.",
     cameraError:"Could not start camera. Use manual entry below.",
@@ -436,6 +443,8 @@ const I18N = {
     exportUnits:"ส่งออกซีเรียล", importUnits:"นำเข้าซีเรียล", dataIO:"ข้อมูล",
     template:"เทมเพลท", noCodeColumn:"ไม่พบคอลัมน์ code — ใช้เทมเพลท", importedZero:"นำเข้า 0 รายการ — ตรวจไฟล์ หรือใช้เทมเพลท",
     moveQtyLabel:"จำนวนที่รับเข้า / จ่ายออก", overDispatch:"จ่ายออกเกินจำนวนคงเหลือ (ตั้งเป็น 0)",
+    lock:"ล็อก", lockedTag:"ล็อก", lockedNotice:"ล็อกอยู่ — แก้ไขข้อมูลไม่ได้ (ยังรับเข้า/จ่ายออกได้)",
+    lockAll:"ล็อก/ปลดล็อกทั้งหมด", lockedAll:"ล็อกสินค้าทั้งหมดแล้ว", unlockedAll:"ปลดล็อกทั้งหมดแล้ว",
     unlock:"ปลดล็อก", wrongPasscode:"รหัสผ่านไม่ถูกต้อง", wrongLogin:"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง", username:"ชื่อผู้ใช้", locked:"ล็อกแล้ว",
     cameraDenied:"กล้องถูกบล็อก อนุญาตในตั้งค่าเบราว์เซอร์ หรือกรอกรหัสเอง",
     cameraError:"เปิดกล้องไม่ได้ ใช้การกรอกรหัสด้านล่าง",
@@ -617,6 +626,7 @@ function renderList(){
     const item=el("div",{className:"item"});
     const body=el("div",{className:"body"});
     const nm=el("div",{className:"nm"}, p.name||p.code);
+    if(p.locked) nm.append(el("span",{className:"tag lock"}, "🔒"));
     if(p.tracking==="serial") nm.append(el("span",{className:"tag serial"}, t("serial")));
     if(low) nm.append(el("span",{className:"badge-low"}, t("lowStock")));
     const meta=el("div",{className:"meta"},
@@ -902,10 +912,18 @@ function openSheet(code, keepScroll=false){
   const p=state.products.get(code); if(!p){ promptAddUnknown(code); return; }
   openSheetCode=code;
   const oh=onHand(code), val=oh*(p.cost||0), low=oh<=(p.min||0);
+  const locked = !!p.locked;
   const head = `<h2>${p.name||p.code}</h2>
     <div class="sub"><span>${p.code}</span>
       <span class="tag ${p.tracking==='serial'?'serial':''}">${p.tracking==='serial'?t('serialized'):t('quantity')}</span>
+      ${locked?`<span class="tag lock">🔒 ${t('lockedTag')}</span>`:""}
       ${p.loc?`<span>· ${p.loc}</span>`:""}${low?`<span class="badge-low">${t('lowStock')}</span>`:""}</div>`;
+  // locked → details frozen (edit/delete disabled), but stock in/out still allowed
+  const footer = `${locked?`<div class="locknote">🔒 ${t('lockedNotice')}</div>`:""}
+    <div class="row"><button class="btn" id="editBtn" ${locked?"disabled":""}>${t("editDetails")}</button>
+      <button class="btn" id="delBtn" ${locked?"disabled":""} style="color:var(--warn)">${t("delete")}</button></div>
+    <div style="height:8px"></div>
+    <div class="row"><button class="btn" id="lockBtn">${locked?("🔓 "+t("unlock")):("🔒 "+t("lock"))}</button></div>`;
 
   if(p.tracking==="serial"){
     const ins = unitsOf(code).filter(u=>u.status==="in").sort((a,b)=>(b.checked_in_at||"").localeCompare(a.checked_in_at||""));
@@ -927,8 +945,7 @@ function openSheet(code, keepScroll=false){
           <span class="sn">${h.serial}</span><span class="when">${fmtTime(h.when)}</span></div>`).join("")
         : `<div class="empty" style="padding:10px">${t("noHistory")}</div>` }</div>
       <div style="height:14px"></div>
-      <div class="row"><button class="btn" id="editBtn">${t("editDetails")}</button>
-        <button class="btn" id="delBtn" style="color:var(--warn)">${t("delete")}</button></div>`);
+      ${footer}`);
     $("#serlist").querySelectorAll("[data-out]").forEach(b=> b.onclick=()=>{
       const prevMode=state.mode; state.mode="out"; applySerialAction(p, b.dataset.out); state.mode=prevMode; openSheet(code);
     });
@@ -945,8 +962,7 @@ function openSheet(code, keepScroll=false){
       <div class="field"><label>${t("setQty")}</label>
         <div class="two"><input id="setQ" type="number" inputmode="numeric" value="${p.qty||0}" />
           <button class="btn dark" id="setBtn">${t("set")}</button></div></div>
-      <div class="row"><button class="btn" id="editBtn">${t("editDetails")}</button>
-        <button class="btn" id="delBtn" style="color:var(--warn)">${t("delete")}</button></div>`);
+      ${footer}`);
     const refresh=()=>{ const cur=state.products.get(code); $("#qtyNum").firstChild.textContent=cur.qty||0;
       $("#lineVal").textContent=money((cur.qty||0)*(cur.cost||0)); renderAll(); };
     // enter how many came IN / went OUT → system computes remaining (fewer errors than manual +/-)
@@ -963,17 +979,21 @@ function openSheet(code, keepScroll=false){
       upsertProduct({...cur, qty:nv}); refresh(); showUndo(`${cur.name||code} → ${nv}`, ()=>{upsertProduct({...state.products.get(code),qty:before}); refresh();}); };
   }
 
-  $("#editBtn").onclick=()=>openProductForm(state.products.get(code), false);
-  $("#delBtn").onclick=()=>{
-    if(!confirm(t("deleteConfirm"))) return;
-    const snapshot={...p}, unitSnap=unitsOf(code).map(u=>({...u}));
-    deleteProduct(code); closeSheet(); toast(t("deleted"),"warn");
-    showUndo(`${p.name||code} ${t("deleted")}`, ()=>{ upsertProduct(snapshot); unitSnap.forEach(u=>upsertUnit(u)); });
-  };
+  $("#lockBtn").onclick=()=>{ const cur=state.products.get(code); upsertProduct({...cur, locked:!cur.locked}); openSheet(code); };
+  if(!locked){
+    $("#editBtn").onclick=()=>openProductForm(state.products.get(code), false);
+    $("#delBtn").onclick=()=>{
+      if(!confirm(t("deleteConfirm"))) return;
+      const snapshot={...p}, unitSnap=unitsOf(code).map(u=>({...u}));
+      deleteProduct(code); closeSheet(); toast(t("deleted"),"warn");
+      showUndo(`${p.name||code} ${t("deleted")}`, ()=>{ upsertProduct(snapshot); unitSnap.forEach(u=>upsertUnit(u)); });
+    };
+  }
 }
 
 /* ───────────────────────── ADD / EDIT FORM (G) ───────────────────────── */
 function openProductForm(p, isNew, pendingSerial=null){
+  if(!isNew && p && p.locked){ toast(t("lockedNotice"),"warn"); return; }   // locked → details frozen
   openModal(`<h2>${isNew?t("addProduct"):t("editProduct")}</h2>
     <div class="field"><label>${t("code")}</label>
       <input id="fCode" inputmode="text" value="${p.code||""}" ${isNew?"":"disabled"} placeholder="SKU / barcode" /></div>
@@ -1051,7 +1071,9 @@ const HEADER_ALIAS = {
   qty:["qty","quantity","on hand","onhand","on-hand","stock","count","amount","จำนวน","คงเหลือ"],
   serial:["serial","serial no","serialno","sn","s/n","ซีเรียล","หมายเลขเครื่อง"],
   status:["status","state","สถานะ"],
+  locked:["locked","lock","ล็อก","ล็อค"],
 };
+const isTrue = v => /^(1|true|yes|y|locked|lock|ล็อก|ล็อค|ใช่|จริง)$/i.test(String(v||"").trim());
 function colMap(head){ const m={}; Object.entries(HEADER_ALIAS).forEach(([f,a])=>{ const i=head.findIndex(h=>a.includes(h)); if(i>=0) m[f]=i; }); return m; }
 const isSerial = v => /seri|ซีเรียล/i.test(String(v||""));
 function download(name, text){
@@ -1060,8 +1082,8 @@ function download(name, text){
   setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500);
 }
 function exportProducts(){
-  const head=["code","name","cost","min","loc","tracking","qty"];
-  const rows=[head, ...[...state.products.values()].map(p=>[p.code,p.name,p.cost,p.min,p.loc,p.tracking||"quantity",p.qty||0])];
+  const head=["code","name","cost","min","loc","tracking","qty","locked"];
+  const rows=[head, ...[...state.products.values()].map(p=>[p.code,p.name,p.cost,p.min,p.loc,p.tracking||"quantity",p.qty||0,p.locked?1:0])];
   download("stockscan-products.csv", toCSV(rows));
 }
 function exportUnits(){
@@ -1086,7 +1108,8 @@ function importProducts(text){
     const tracking=isSerial(get(r,"tracking"))?"serial":"quantity";
     upsertProduct({ code, name:get(r,"name").trim()||code,
       cost:parseFloat(get(r,"cost"))||0, min:parseInt(get(r,"min")||"0",10)||0,
-      loc:get(r,"loc").trim(), tracking, qty: tracking==="serial"?0:(parseInt(get(r,"qty")||"0",10)||0) }); n++; }
+      loc:get(r,"loc").trim(), tracking, qty: tracking==="serial"?0:(parseInt(get(r,"qty")||"0",10)||0),
+      locked: col.locked!==undefined ? isTrue(get(r,"locked")) : false }); n++; }
   toast(n>0 ? `${t("importProducts")}: ${n}` : t("importedZero"), n>0?"ok":"warn");
 }
 function importUnits(text){
@@ -1162,6 +1185,13 @@ $("#manualGo").onclick=()=>{ const v=$("#manualCode").value.trim(); if(!v) retur
 $("#manualCode").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#manualGo").click(); }});
 // CSV
 $("#tmplBtn").onclick=downloadTemplate;
+// bulk lock/unlock all products (freeze the baseline catalog after import)
+$("#lockAllBtn").onclick=()=>{
+  const prods=[...state.products.values()]; if(!prods.length) return;
+  const lockAll = prods.some(p=>!p.locked);   // any unlocked → lock all; else unlock all
+  prods.forEach(p=> upsertProduct({...p, locked:lockAll}));
+  toast(lockAll? t("lockedAll") : t("unlockedAll"), "ok");
+};
 $("#expProd").onclick=exportProducts; $("#expUnits").onclick=exportUnits;
 $("#impProd").onclick=()=>$("#fileProd").click(); $("#impUnits").onclick=()=>$("#fileUnits").click();
 $("#fileProd").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>importProducts(r.result); r.readAsText(f); e.target.value=""; };
