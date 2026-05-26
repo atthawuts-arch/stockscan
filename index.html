@@ -295,6 +295,8 @@
       <div style="height:14px"></div>
       <button class="btn primary block" id="addBtn">+ <span data-t="add">Add</span></button>
       <div class="section-h" data-t="dataIO">Data</div>
+      <div class="row"><button class="btn sm" id="tmplBtn" data-t="template">Template</button></div>
+      <div style="height:8px"></div>
       <div class="row">
         <button class="btn sm" id="expProd" data-t="exportProducts">Export products</button>
         <button class="btn sm" id="impProd" data-t="importProducts">Import products</button>
@@ -399,6 +401,8 @@ const I18N = {
     noProducts:"No products yet. Scan or tap Add.", noMatches:"No matching products.",
     exportProducts:"Export products", importProducts:"Import products",
     exportUnits:"Export units", importUnits:"Import units", dataIO:"Data",
+    template:"Template", noCodeColumn:"No ‘code’ column found — use the Template", importedZero:"Imported 0 — check the file or use the Template",
+    moveQtyLabel:"Quantity in / out", overDispatch:"Dispatch exceeds on-hand (set to 0)",
     unlock:"Unlock", wrongPasscode:"Wrong passcode", wrongLogin:"Wrong username or password", username:"Username", locked:"Locked",
     cameraDenied:"Camera blocked. Allow access in your browser settings, or use manual entry.",
     cameraError:"Could not start camera. Use manual entry below.",
@@ -430,6 +434,8 @@ const I18N = {
     noProducts:"ยังไม่มีสินค้า กดสแกนหรือเพิ่ม", noMatches:"ไม่พบสินค้าที่ค้นหา",
     exportProducts:"ส่งออกสินค้า", importProducts:"นำเข้าสินค้า",
     exportUnits:"ส่งออกซีเรียล", importUnits:"นำเข้าซีเรียล", dataIO:"ข้อมูล",
+    template:"เทมเพลท", noCodeColumn:"ไม่พบคอลัมน์ code — ใช้เทมเพลท", importedZero:"นำเข้า 0 รายการ — ตรวจไฟล์ หรือใช้เทมเพลท",
+    moveQtyLabel:"จำนวนที่รับเข้า / จ่ายออก", overDispatch:"จ่ายออกเกินจำนวนคงเหลือ (ตั้งเป็น 0)",
     unlock:"ปลดล็อก", wrongPasscode:"รหัสผ่านไม่ถูกต้อง", wrongLogin:"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง", username:"ชื่อผู้ใช้", locked:"ล็อกแล้ว",
     cameraDenied:"กล้องถูกบล็อก อนุญาตในตั้งค่าเบราว์เซอร์ หรือกรอกรหัสเอง",
     cameraError:"เปิดกล้องไม่ได้ ใช้การกรอกรหัสด้านล่าง",
@@ -928,12 +934,14 @@ function openSheet(code, keepScroll=false){
     });
   } else {
     openModal(`${head}
-      <div class="qtybig">
-        <button id="dec">−</button>
-        <div class="num" id="qtyNum">${p.qty||0}<small>${t("onHand")}</small></div>
-        <button class="primary" id="inc">+</button>
-      </div>
+      <div class="qtybig"><div class="num" id="qtyNum">${p.qty||0}<small>${t("onHand")}</small></div></div>
       <div class="valueline"><span>${t("value")}</span><span id="lineVal">${money(val)}</span></div>
+      <div class="field"><label>${t("moveQtyLabel")}</label>
+        <input id="moveQ" type="number" inputmode="numeric" min="1" value="1" />
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="moveIn" style="background:var(--ok);border-color:var(--ok);color:#fff">+ ${t("checkIn")}</button>
+          <button class="btn" id="moveOut" style="background:var(--warn);border-color:var(--warn);color:#fff">− ${t("checkOut")}</button>
+        </div></div>
       <div class="field"><label>${t("setQty")}</label>
         <div class="two"><input id="setQ" type="number" inputmode="numeric" value="${p.qty||0}" />
           <button class="btn dark" id="setBtn">${t("set")}</button></div></div>
@@ -941,10 +949,16 @@ function openSheet(code, keepScroll=false){
         <button class="btn" id="delBtn" style="color:var(--warn)">${t("delete")}</button></div>`);
     const refresh=()=>{ const cur=state.products.get(code); $("#qtyNum").firstChild.textContent=cur.qty||0;
       $("#lineVal").textContent=money((cur.qty||0)*(cur.cost||0)); renderAll(); };
-    $("#inc").onclick=()=>{ const cur=state.products.get(code); const before=cur.qty||0;
-      upsertProduct({...cur, qty:before+1}); refresh(); showUndo(`${cur.name||code} +1`, ()=>{upsertProduct({...state.products.get(code),qty:before}); refresh();}); };
-    $("#dec").onclick=()=>{ const cur=state.products.get(code); const before=cur.qty||0; if(before<=0){toast(t("qtyEmpty"),"warn");return;}
-      upsertProduct({...cur, qty:before-1}); refresh(); showUndo(`${cur.name||code} −1`, ()=>{upsertProduct({...state.products.get(code),qty:before}); refresh();}); };
+    // enter how many came IN / went OUT → system computes remaining (fewer errors than manual +/-)
+    const move=(sign)=>{ const cur=state.products.get(code); const before=cur.qty||0;
+      const nMove=Math.max(1, parseInt($("#moveQ").value||"1",10)||1);
+      let after = sign>0 ? before+nMove : before-nMove; let over=false; if(after<0){ after=0; over=true; }
+      const np={...cur, qty:after}; if(sign>0 && state.shelf) np.loc=state.shelf;
+      upsertProduct(np); refresh();
+      toast(over ? t("overDispatch") : `${cur.name||code} ${sign>0?"+":"−"}${nMove} → ${after} ${t("onHandShort")}`, over?"warn":"ok");
+      showUndo(`${cur.name||code} ${sign>0?"+":"−"}${nMove}`, ()=>{ upsertProduct({...state.products.get(code), qty:before}); refresh(); }); };
+    $("#moveIn").onclick=()=>move(1);
+    $("#moveOut").onclick=()=>move(-1);
     $("#setBtn").onclick=()=>{ const cur=state.products.get(code); const before=cur.qty||0; const nv=Math.max(0,parseInt($("#setQ").value||"0",10));
       upsertProduct({...cur, qty:nv}); refresh(); showUndo(`${cur.name||code} → ${nv}`, ()=>{upsertProduct({...state.products.get(code),qty:before}); refresh();}); };
   }
@@ -1003,18 +1017,43 @@ function openProductForm(p, isNew, pendingSerial=null){
 }
 
 /* ───────────────────────── CSV (products + units) ───────────────────────── */
-function csvEscape(v){ v=(v==null?"":String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
-function toCSV(rows){ return rows.map(r=>r.map(csvEscape).join(",")).join("\r\n"); }
-function parseCSV(text){
+const BOM="﻿";   // Excel/Sheets prepend this; we add it to exports so Thai shows correctly
+function csvEscape(v){ v=(v==null?"":String(v)); return /[",\n;\t]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+function toCSV(rows){ return BOM + rows.map(r=>r.map(csvEscape).join(",")).join("\r\n"); }
+// auto-pick the delimiter (handles Excel locales that export ';' or TAB instead of ',')
+function detectDelim(text){
+  const line=(text.split(/\r?\n/)[0]||"");
+  const c={",":(line.match(/,/g)||[]).length,";":(line.match(/;/g)||[]).length,"\t":(line.match(/\t/g)||[]).length};
+  if(c[";"]>c[","] && c[";"]>=c["\t"]) return ";";
+  if(c["\t"]>c[","]) return "\t";
+  return ",";
+}
+function parseCSV(text, delim){
+  text=text.replace(/^﻿/,"");                 // strip BOM
+  delim=delim||detectDelim(text);
   const rows=[]; let row=[], cur="", q=false;
   for(let i=0;i<text.length;i++){ const c=text[i];
     if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
-    else { if(c==='"') q=true; else if(c===","){ row.push(cur); cur=""; }
+    else { if(c==='"') q=true; else if(c===delim){ row.push(cur); cur=""; }
       else if(c==="\n"){ row.push(cur); rows.push(row); row=[]; cur=""; }
       else if(c==="\r"){} else cur+=c; } }
   if(cur.length||row.length){ row.push(cur); rows.push(row); }
   return rows.filter(r=> r.length && r.some(x=>x!==""));
 }
+// accepted header names → canonical field (case-insensitive; common EN + TH)
+const HEADER_ALIAS = {
+  code:["code","sku","barcode","id","productcode","product code","item code","รหัส","รหัสสินค้า","บาร์โค้ด"],
+  name:["name","product","product name","productname","description","desc","item","ชื่อ","ชื่อสินค้า","รายการ"],
+  cost:["cost","price","unit cost","unitcost","unit price","ต้นทุน","ราคา","ราคาต้นทุน"],
+  min:["min","minimum","min stock","minstock","reorder","reorder point","ขั้นต่ำ","จุดสั่งซื้อ"],
+  loc:["loc","location","shelf","bin","ที่เก็บ","ชั้น","ชั้นวาง"],
+  tracking:["tracking","type","track","mode","ประเภท","ประเภทการนับ"],
+  qty:["qty","quantity","on hand","onhand","on-hand","stock","count","amount","จำนวน","คงเหลือ"],
+  serial:["serial","serial no","serialno","sn","s/n","ซีเรียล","หมายเลขเครื่อง"],
+  status:["status","state","สถานะ"],
+};
+function colMap(head){ const m={}; Object.entries(HEADER_ALIAS).forEach(([f,a])=>{ const i=head.findIndex(h=>a.includes(h)); if(i>=0) m[f]=i; }); return m; }
+const isSerial = v => /seri|ซีเรียล/i.test(String(v||""));
 function download(name, text){
   const blob=new Blob([text],{type:"text/csv;charset=utf-8"});
   const a=el("a",{href:URL.createObjectURL(blob), download:name}); document.body.append(a); a.click();
@@ -1030,28 +1069,40 @@ function exportUnits(){
   const rows=[head, ...[...state.units.values()].map(u=>[u.code,u.serial,u.status,u.loc||""])];
   download("stockscan-units.csv", toCSV(rows));
 }
+function downloadTemplate(){   // ready-to-fill products file: exact columns + two examples
+  const head=["code","name","cost","min","loc","tracking","qty"];
+  const rows=[head,
+    ["LOGA-AUR65","LOGA Aurora 65 Keyboard","2990","3","A-01","serial","0"],
+    ["LOGA-GRD-XL","LOGA Garuda Mousepad XL","590","8","B-02","quantity","48"]];
+  download("loga-stock-template.csv", toCSV(rows));
+}
 function importProducts(text){
-  const rows=parseCSV(text); if(!rows.length) return; const head=rows[0].map(h=>h.trim().toLowerCase());
-  const ix=(k)=>head.indexOf(k);
+  const rows=parseCSV(text); if(rows.length<2){ toast(t("importedZero"),"warn"); return; }
+  const head=rows[0].map(h=>h.trim().toLowerCase()); const col=colMap(head);
+  if(col.code===undefined){ toast(t("noCodeColumn"),"err"); return; }   // wrong columns → say so clearly
+  const get=(r,f)=> col[f]!==undefined ? (r[col[f]]||"") : "";
   let n=0;
-  for(let i=1;i<rows.length;i++){ const r=rows[i]; const code=(r[ix("code")]||"").trim(); if(!code) continue;
-    const tracking=(r[ix("tracking")]||"quantity").trim()==="serial"?"serial":"quantity";
-    upsertProduct({ code, name:(r[ix("name")]||code).trim(),
-      cost:parseFloat(r[ix("cost")])||0, min:parseInt(r[ix("min")]||"0",10)||0,
-      loc:(r[ix("loc")]||"").trim(), tracking, qty: tracking==="serial"?0:(parseInt(r[ix("qty")]||"0",10)||0) }); n++; }
-  toast(`${t("importProducts")}: ${n}`,"ok");
+  for(let i=1;i<rows.length;i++){ const r=rows[i]; const code=get(r,"code").trim(); if(!code) continue;
+    const tracking=isSerial(get(r,"tracking"))?"serial":"quantity";
+    upsertProduct({ code, name:get(r,"name").trim()||code,
+      cost:parseFloat(get(r,"cost"))||0, min:parseInt(get(r,"min")||"0",10)||0,
+      loc:get(r,"loc").trim(), tracking, qty: tracking==="serial"?0:(parseInt(get(r,"qty")||"0",10)||0) }); n++; }
+  toast(n>0 ? `${t("importProducts")}: ${n}` : t("importedZero"), n>0?"ok":"warn");
 }
 function importUnits(text){
-  const rows=parseCSV(text); if(!rows.length) return; const head=rows[0].map(h=>h.trim().toLowerCase());
-  const ix=(k)=>head.indexOf(k); let n=0;
-  for(let i=1;i<rows.length;i++){ const r=rows[i]; const code=(r[ix("code")]||"").trim(); const serial=(r[ix("serial")]||"").trim();
+  const rows=parseCSV(text); if(rows.length<2){ toast(t("importedZero"),"warn"); return; }
+  const head=rows[0].map(h=>h.trim().toLowerCase()); const col=colMap(head);
+  if(col.code===undefined || col.serial===undefined){ toast(t("noCodeColumn"),"err"); return; }
+  const get=(r,f)=> col[f]!==undefined ? (r[col[f]]||"") : "";
+  let n=0;
+  for(let i=1;i<rows.length;i++){ const r=rows[i]; const code=get(r,"code").trim(), serial=get(r,"serial").trim();
     if(!code||!serial) continue;
-    const status=(r[ix("status")]||"in").trim()==="out"?"out":"in";
-    const loc=(ix("loc")>=0?(r[ix("loc")]||""):"").trim()||null;
+    const status=get(r,"status").trim().toLowerCase()==="out"?"out":"in";
+    const loc=get(r,"loc").trim()||null;
     const existing=findUnit(code,serial);
     const u = existing? {...existing,status,loc:loc||existing.loc||null} : {id:uuid(),code,serial,status,checked_in_at:status==="in"?nowISO():null,checked_out_at:status==="out"?nowISO():null,loc};
     upsertUnit(u); n++; }
-  toast(`${t("importUnits")}: ${n}`,"ok");
+  toast(n>0 ? `${t("importUnits")}: ${n}` : t("importedZero"), n>0?"ok":"warn");
 }
 
 /* ───────────────────────── PASSCODE GATE (B) ───────────────────────── */
@@ -1110,6 +1161,7 @@ $("#camBtn").onclick=enableCamera;
 $("#manualGo").onclick=()=>{ const v=$("#manualCode").value.trim(); if(!v) return; $("#manualCode").value=""; handleScan(v, null); };
 $("#manualCode").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#manualGo").click(); }});
 // CSV
+$("#tmplBtn").onclick=downloadTemplate;
 $("#expProd").onclick=exportProducts; $("#expUnits").onclick=exportUnits;
 $("#impProd").onclick=()=>$("#fileProd").click(); $("#impUnits").onclick=()=>$("#fileUnits").click();
 $("#fileProd").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>importProducts(r.result); r.readAsText(f); e.target.value=""; };
