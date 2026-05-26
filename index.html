@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
 <meta name="theme-color" content="#141210" />
-<title>StockScan</title>
+<title>LOGA Stock Scanner</title>
 <link rel="manifest" href="./manifest.webmanifest" />
 <link rel="apple-touch-icon" href="./icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -224,9 +224,12 @@
   .gate .mark i:nth-child(2){height:22px}.gate .mark i:nth-child(3){width:5px}.gate .mark i:nth-child(4){height:18px}
   .gate h1{font-size:24px;font-weight:800;letter-spacing:.05em;margin:0}
   .gate p{color:#b8b1a6;font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;margin:-8px 0 0}
-  .gate .pin{display:flex;gap:9px}
-  .gate .pin input{width:200px;text-align:center;letter-spacing:.5em;font-size:22px;font-family:"IBM Plex Mono",monospace;
+  .gate .pin{display:flex;flex-direction:column;gap:10px;width:248px}
+  .gate .pin input{width:100%;text-align:center;
     background:#0c0b0a;border:2px solid #4a443c;border-radius:12px;color:var(--bg);padding:13px;outline:none;font-weight:600}
+  .gate .pin input:focus{border-color:var(--orange)}
+  .gate #userInput{font-size:16px;font-family:"Archivo",sans-serif;letter-spacing:.02em}
+  .gate #pinInput{font-size:22px;font-family:"IBM Plex Mono",monospace;letter-spacing:.4em}
   .gate.bad .pin input{border-color:var(--warn);animation:shake .4s}
   @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
   .gate .err{color:#ffb4a1;font-size:12px;font-weight:700;height:16px}
@@ -238,10 +241,13 @@
 <div class="gate" id="gate">
   <div class="mark"><span><i></i><i></i><i></i><i></i></span></div>
   <div style="text-align:center">
-    <h1>STOCKSCAN</h1><p data-t="appTitle">Inventory Control</p>
+    <h1>LOGA</h1><p data-t="appTitle">Stock Scanner</p>
   </div>
   <form class="pin" id="pinForm">
-    <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+    <input id="userInput" type="text" inputmode="text" autocomplete="username"
+           autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="40"
+           placeholder="Username" aria-label="username" data-tph="username" />
+    <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password"
            autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="32"
            placeholder="• • • • • • • • •" aria-label="passcode" data-tph="enterPasscode" />
   </form>
@@ -366,7 +372,8 @@
    Leave the placeholders to run fully LOCAL (localStorage only). */
 const SUPABASE_URL      = "https://dvwczrukbfzmcrijrcos.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_26bfcqsLcnCYLYO3ac1lzw_td_w_eSt";
-const APP_PASSCODE      = "212224236";     // shared device passcode
+const APP_USERNAME      = "LOGAstaff";      // only this username may log in (case-insensitive)
+const APP_PASSCODE      = "212224236";     // password for that username
 const DEFAULT_LANG      = "th";            // "th" or "en"
 const CURRENCY          = "฿";
 const SCAN_COOLDOWN_MS  = 1500;            // min time before the SAME code counts again
@@ -375,7 +382,7 @@ const FRAME_CLEAR_MS    = 800;             // empty frame this long => item left
 /* ───────────────────────── i18n (J) ───────────────────────── */
 const I18N = {
   en:{
-    brand:"StockScan", appTitle:"Inventory Control", products:"Products", totalUnits:"Total Units",
+    brand:"LOGA", appTitle:"Stock Scanner", products:"Products", totalUnits:"Total Units",
     inventoryValue:"Inventory Value", lowStock:"Low Stock", lowStockShort:"Low", onHand:"On hand",
     inventory:"Inventory", scan:"Scan", add:"Add", checkIn:"Check-in", checkOut:"Check-out",
     continuousScan:"Continuous scan", continuousHint:"Hands-free — applies the mode per scan",
@@ -392,7 +399,7 @@ const I18N = {
     noProducts:"No products yet. Scan or tap Add.", noMatches:"No matching products.",
     exportProducts:"Export products", importProducts:"Import products",
     exportUnits:"Export units", importUnits:"Import units", dataIO:"Data",
-    unlock:"Unlock", wrongPasscode:"Wrong passcode", locked:"Locked",
+    unlock:"Unlock", wrongPasscode:"Wrong passcode", wrongLogin:"Wrong username or password", username:"Username", locked:"Locked",
     cameraDenied:"Camera blocked. Allow access in your browser settings, or use manual entry.",
     cameraError:"Could not start camera. Use manual entry below.",
     checkedIn:"checked in", checkedOut:"checked out", onHandShort:"on hand",
@@ -406,7 +413,7 @@ const I18N = {
     sessionShelf:"Shelf · this session", shelfPh:"Shelf / bin — optional"
   },
   th:{
-    brand:"StockScan", appTitle:"ระบบจัดการสต๊อก", products:"สินค้า", totalUnits:"จำนวนรวม",
+    brand:"LOGA", appTitle:"ระบบสแกนสต๊อก", products:"สินค้า", totalUnits:"จำนวนรวม",
     inventoryValue:"มูลค่าสต๊อก", lowStock:"สต๊อกต่ำ", lowStockShort:"ต่ำ", onHand:"คงเหลือ",
     inventory:"คลังสินค้า", scan:"สแกน", add:"เพิ่ม", checkIn:"รับเข้า", checkOut:"จ่ายออก",
     continuousScan:"สแกนต่อเนื่อง", continuousHint:"แฮนด์ฟรี — ทำตามโหมดทุกครั้งที่สแกน",
@@ -423,7 +430,7 @@ const I18N = {
     noProducts:"ยังไม่มีสินค้า กดสแกนหรือเพิ่ม", noMatches:"ไม่พบสินค้าที่ค้นหา",
     exportProducts:"ส่งออกสินค้า", importProducts:"นำเข้าสินค้า",
     exportUnits:"ส่งออกซีเรียล", importUnits:"นำเข้าซีเรียล", dataIO:"ข้อมูล",
-    unlock:"ปลดล็อก", wrongPasscode:"รหัสผ่านไม่ถูกต้อง", locked:"ล็อกแล้ว",
+    unlock:"ปลดล็อก", wrongPasscode:"รหัสผ่านไม่ถูกต้อง", wrongLogin:"ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง", username:"ชื่อผู้ใช้", locked:"ล็อกแล้ว",
     cameraDenied:"กล้องถูกบล็อก อนุญาตในตั้งค่าเบราว์เซอร์ หรือกรอกรหัสเอง",
     cameraError:"เปิดกล้องไม่ได้ ใช้การกรอกรหัสด้านล่าง",
     checkedIn:"รับเข้าแล้ว", checkedOut:"จ่ายออกแล้ว", onHandShort:"คงเหลือ",
@@ -1053,8 +1060,10 @@ function unlock(){ localStorage.setItem("ss_unlocked","1"); $("#gate").classList
 function lock(){ localStorage.removeItem("ss_unlocked"); location.reload(); }
 $("#pinForm").addEventListener("submit",(e)=>{
   e.preventDefault();
-  if($("#pinInput").value===APP_PASSCODE){ unlock(); }
-  else { $("#gate").classList.add("bad"); $("#pinErr").textContent=t("wrongPasscode");
+  const okUser = $("#userInput").value.trim().toLowerCase() === APP_USERNAME.toLowerCase(); // username case-insensitive
+  const okPass = $("#pinInput").value === APP_PASSCODE;                                      // password exact
+  if(okUser && okPass){ unlock(); }
+  else { $("#gate").classList.add("bad"); $("#pinErr").textContent=t("wrongLogin");
     setTimeout(()=>$("#gate").classList.remove("bad"),450); $("#pinInput").value=""; }
 });
 // discreet Lock: long-press the logo
@@ -1120,7 +1129,7 @@ async function boot(){
   $("#lowChip").classList.toggle("on", state.lowOnly);
   loadCache(); renderAll();          // offline-first: show last-known stock immediately
   if(isUnlocked()){ $("#gate").classList.add("hide"); $("#app").classList.remove("hide"); }
-  else { $("#pinInput").focus(); }
+  else { $("#userInput").focus(); }
   await initCloud();
   if(sb){ await pullAll(); subscribeRealtime(); flushQueue(); }
   setNet();

@@ -1,7 +1,7 @@
 {
-  "name": "StockScan",
-  "short_name": "StockScan",
-  "description": "Warehouse inventory control — barcode & serial scanning, check-in/out, live shared stock.",
+  "name": "LOGA Stock Scanner",
+  "short_name": "LOGA Stock",
+  "description": "LOGA warehouse inventory — barcode & serial scanning, check-in/out, live shared stock.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
