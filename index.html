@@ -124,6 +124,31 @@
   .row{display:flex;gap:8px}
   .row>*{flex:1}
 
+  /* ---------- dashboard ---------- */
+  .dash-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .dash-card{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+  .dash-card .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .dash-card .v{font-size:22px;font-weight:800;margin-top:2px}
+  .dash-card.in{border-left:3px solid #22c55e}
+  .dash-card.out{border-left:3px solid #ef4444}
+  .dash-card.total{border-left:3px solid var(--orange)}
+  .seg#dashRange{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  .seg#dashRange button{flex:1;min-width:60px;padding:8px 6px;font-size:11px;border:1px solid var(--line);background:var(--paper);border-radius:9px;cursor:pointer;text-transform:uppercase;font-weight:700;letter-spacing:.03em}
+  .seg#dashRange button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .dash-custom{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .dash-custom input{flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);font-family:inherit}
+  .dash-chart-wrap{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:12px;margin:10px 0}
+  .dash-chart-wrap svg{display:block;width:100%;height:auto}
+  .dash-log{display:flex;flex-direction:column;gap:4px;max-height:420px;overflow-y:auto}
+  .dash-log .log-row{display:grid;grid-template-columns:78px 1fr 48px auto;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);font-size:12px}
+  .dash-log .log-row .time{font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:10px}
+  .dash-log .log-row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dash-log .log-row .qty{text-align:right;font-weight:800;font-family:"IBM Plex Mono",monospace}
+  .dash-log .log-row .qty.in{color:#16a34a}
+  .dash-log .log-row .qty.out{color:#dc2626}
+  .dash-log .log-row .meta{font-size:10px;color:var(--muted)}
+  .dash-log .empty{padding:20px;text-align:center;color:var(--muted);font-size:12px}
+
   /* ---------- scan view ---------- */
   .scanwrap{background:#0c0b0a;border:2px solid var(--line);border-radius:var(--r);overflow:hidden;
     position:relative;aspect-ratio:3/4;display:grid;place-items:center}
@@ -313,6 +338,7 @@
   <nav class="tabs">
     <button data-tab="inv" class="on" data-t="inventory">Inventory</button>
     <button data-tab="scan" data-t="scan">Scan</button>
+    <button data-tab="dash" data-t="dashboard">Dashboard</button>
   </nav>
 
   <main>
@@ -387,6 +413,39 @@
         <div class="v" id="lastScan">—</div>
       </div>
     </section>
+
+    <!-- DASHBOARD VIEW -->
+    <section class="view" id="view-dash">
+      <div class="dash-cards">
+        <div class="dash-card in"><div class="k" data-t="todayIn">Today in</div><div class="v mono" id="dashTodayIn">0</div></div>
+        <div class="dash-card out"><div class="k" data-t="todayOut">Today out</div><div class="v mono" id="dashTodayOut">0</div></div>
+        <div class="dash-card total"><div class="k" data-t="totalStock">Stock</div><div class="v mono" id="dashTotal">0</div></div>
+      </div>
+
+      <div class="field">
+        <label data-t="product">Product</label>
+        <select id="dashProduct"><option value="" data-t="allProducts">All products</option></select>
+      </div>
+
+      <div class="seg" id="dashRange">
+        <button type="button" data-r="1d" class="on" data-t="r1d">1 day</button>
+        <button type="button" data-r="7d" data-t="r7d">7 days</button>
+        <button type="button" data-r="30d" data-t="r30d">1 month</button>
+        <button type="button" data-r="all" data-t="rAll">All</button>
+        <button type="button" data-r="custom" data-t="rCustom">Custom</button>
+      </div>
+
+      <div class="dash-custom" id="dashCustomRow" style="display:none">
+        <input type="date" id="dashFrom" />
+        <span>→</span>
+        <input type="date" id="dashTo" />
+      </div>
+
+      <div class="dash-chart-wrap"><div id="dashChart"></div></div>
+
+      <div class="section-h" data-t="historyLog">History</div>
+      <div class="dash-log" id="dashLog"></div>
+    </section>
   </main>
 </div>
 
@@ -422,7 +481,11 @@ const I18N = {
   en:{
     brand:"LOGA", appTitle:"Stock Scanner", products:"Products", totalUnits:"Total Units",
     inventoryValue:"Inventory Value", lowStock:"Low Stock", lowStockShort:"Low", onHand:"On hand",
-    inventory:"Inventory", scan:"Scan", add:"Add", checkIn:"Check-in", checkOut:"Check-out",
+    inventory:"Inventory", scan:"Scan", dashboard:"Dashboard", add:"Add", checkIn:"Check-in", checkOut:"Check-out",
+    todayIn:"Today · in", todayOut:"Today · out", totalStock:"Total stock",
+    product:"Product", allProducts:"All products", historyLog:"History",
+    r1d:"1 day", r7d:"7 days", r30d:"1 month", rAll:"All", rCustom:"Custom",
+    noActivity:"No activity in this range", noMovementsYet:"No movements logged yet — start scanning to fill the history",
     continuousScan:"Continuous scan", continuousHint:"Hands-free — applies the mode per scan",
     serial:"Serial", tracking:"Tracking", quantity:"Quantity", serialized:"Serialized",
     alreadyInStock:"Already in stock", notFound:"Not found", undo:"Undo",
@@ -457,7 +520,11 @@ const I18N = {
   th:{
     brand:"LOGA", appTitle:"ระบบสแกนสต๊อก", products:"สินค้า", totalUnits:"จำนวนรวม",
     inventoryValue:"มูลค่าสต๊อก", lowStock:"สต๊อกต่ำ", lowStockShort:"ต่ำ", onHand:"คงเหลือ",
-    inventory:"คลังสินค้า", scan:"สแกน", add:"เพิ่ม", checkIn:"รับเข้า", checkOut:"จ่ายออก",
+    inventory:"คลังสินค้า", scan:"สแกน", dashboard:"แดชบอร์ด", add:"เพิ่ม", checkIn:"รับเข้า", checkOut:"จ่ายออก",
+    todayIn:"วันนี้ · รับเข้า", todayOut:"วันนี้ · จ่ายออก", totalStock:"คงเหลือรวม",
+    product:"สินค้า", allProducts:"ทั้งหมด", historyLog:"ประวัติ",
+    r1d:"1 วัน", r7d:"7 วัน", r30d:"1 เดือน", rAll:"ทั้งหมด", rCustom:"กำหนดเอง",
+    noActivity:"ไม่มีรายการในช่วงนี้", noMovementsYet:"ยังไม่มีบันทึก — เริ่มสแกนเพื่อบันทึกประวัติ",
     continuousScan:"สแกนต่อเนื่อง", continuousHint:"แฮนด์ฟรี — ทำตามโหมดทุกครั้งที่สแกน",
     serial:"ซีเรียล", tracking:"ประเภทการนับ", quantity:"ตามจำนวน", serialized:"ตามซีเรียล",
     alreadyInStock:"มีอยู่ในสต๊อกแล้ว", notFound:"ไม่พบรายการ", undo:"เลิกทำ",
@@ -498,13 +565,41 @@ const money = (n)=> CURRENCY + (Math.round((n||0)*100)/100).toLocaleString(undef
 const state = {
   products:new Map(),         // code -> {code,name,cost,min,loc,tracking,qty,updated_at}
   units:new Map(),            // id   -> {id,code,serial,status,checked_in_at,checked_out_at,loc,updated_at}
+  movements:new Map(),        // id   -> {id,code,serial,kind,qty,shelf,at}  (per-scan event log)
   mode:"in",                  // 'in' | 'out'
   continuous:false,
   shelf: sessionStorage.getItem("ss_shelf")||"",   // session shelf: stamped on every check-in
   lowOnly: sessionStorage.getItem("ss_lowonly")==="1",
   online: navigator.onLine,
   queue: JSON.parse(localStorage.getItem("ss_queue")||"[]"),
+  // dashboard view state
+  dash: {
+    range: localStorage.getItem("ss_dash_range") || "1d",   // 1d | 7d | 30d | all | custom
+    productCode: "",                                         // "" = all products
+    from: "", to: "",                                        // YYYY-MM-DD (Bangkok), for custom
+  },
 };
+
+/* ───────────────────────── Bangkok time helpers (GMT+7) ───────────────────────── */
+const BKK_TZ = "Asia/Bangkok";
+function bkkParts(iso){
+  // Returns {y,m,d,hh,mm} as strings in Asia/Bangkok
+  const ps = new Intl.DateTimeFormat("en-CA",{timeZone:BKK_TZ,
+    year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+  }).formatToParts(new Date(iso));
+  const g = (t) => ps.find(p=>p.type===t)?.value || "";
+  return { y:g("year"), m:g("month"), d:g("day"), hh:g("hour"), mm:g("minute") };
+}
+function bkkDateKey(iso){ const p=bkkParts(iso); return `${p.y}-${p.m}-${p.d}`; }   // "YYYY-MM-DD"
+function bkkHourKey(iso){ const p=bkkParts(iso); return p.hh; }                      // "HH" 00..23
+function bkkFmtDateTime(iso){ const p=bkkParts(iso); return `${p.d}/${p.m} ${p.hh}:${p.mm}`; }
+function bkkToday(){ return bkkDateKey(new Date().toISOString()); }
+function bkkAddDays(key, n){                                    // "YYYY-MM-DD" + n days, still Bangkok
+  const [y,m,d] = key.split("-").map(Number);
+  const t = Date.UTC(y, m-1, d) + n*86400000;
+  const dt = new Date(t);
+  return dt.toISOString().slice(0,10);
+}
 
 /* effective on-hand (used everywhere: list, stats, low-stock, value) */
 function onHand(code){
@@ -540,6 +635,16 @@ async function pullAll(){
     state.units.clear();    (units||[]).forEach(u=>state.units.set(u.id,u));
     saveCache(); renderAll();
   }catch(e){ console.warn("pullAll failed (using cache):", e); }
+  // movements live in a separate table that may not exist yet (one-time migration —
+  // see db/movements.sql). Pull it independently so a missing table never breaks
+  // products/units sync.
+  try{
+    const {data, error} = await sb.from("movements").select("*").order("at",{ascending:false}).limit(5000);
+    if(error) throw error;
+    state.movements.clear(); (data||[]).forEach(m=>state.movements.set(m.id,m));
+    saveCache();
+    if(currentTab==="dash") renderDashboard();
+  }catch(e){ console.warn("pull movements failed (run db/movements.sql to enable the Dashboard):", e); }
 }
 
 function subscribeRealtime(){
@@ -555,6 +660,12 @@ function subscribeRealtime(){
     else { const cur=state.units.get(p.new.id);
       if(!cur || new Date(p.new.updated_at) >= new Date(cur.updated_at)) state.units.set(p.new.id,p.new); }
     saveCache(); renderAll(); refreshOpenSheet();
+  }).subscribe();
+  sb.channel("ss-movements").on("postgres_changes",{event:"*",schema:"public",table:"movements"},(p)=>{
+    if(p.eventType==="DELETE"){ state.movements.delete(p.old.id); }
+    else { state.movements.set(p.new.id, p.new); }
+    saveCache();
+    if(currentTab==="dash") renderDashboard();
   }).subscribe();
 }
 
@@ -574,6 +685,7 @@ async function runOp(op){
   }
   else if(op.kind==="upsertUnit"){ const{error}=await sb.from("units").upsert(op.row); if(error) throw error; }
   else if(op.kind==="deleteUnit"){ const{error}=await sb.from("units").delete().eq("id",op.id); if(error) throw error; }
+  else if(op.kind==="insertMovement"){ const{error}=await sb.from("movements").insert(op.row); if(error) throw error; }
 }
 
 async function push(op){
@@ -597,12 +709,16 @@ async function flushQueue(){
 
 /* ───────────────────────── localStorage cache ───────────────────────── */
 function saveCache(){
-  localStorage.setItem("ss_products", JSON.stringify([...state.products.values()]));
-  localStorage.setItem("ss_units",    JSON.stringify([...state.units.values()]));
+  localStorage.setItem("ss_products",  JSON.stringify([...state.products.values()]));
+  localStorage.setItem("ss_units",     JSON.stringify([...state.units.values()]));
+  // cap movements cache at the most recent 2000 so localStorage doesn't blow up
+  const recentMoves = [...state.movements.values()].sort((a,b)=>(b.at||"").localeCompare(a.at||"")).slice(0, 2000);
+  localStorage.setItem("ss_movements", JSON.stringify(recentMoves));
 }
 function loadCache(){
-  try{ JSON.parse(localStorage.getItem("ss_products")||"[]").forEach(p=>state.products.set(p.code,p)); }catch{}
-  try{ JSON.parse(localStorage.getItem("ss_units")||"[]").forEach(u=>state.units.set(u.id,u)); }catch{}
+  try{ JSON.parse(localStorage.getItem("ss_products") ||"[]").forEach(p=>state.products.set(p.code,p)); }catch{}
+  try{ JSON.parse(localStorage.getItem("ss_units")    ||"[]").forEach(u=>state.units.set(u.id,u)); }catch{}
+  try{ JSON.parse(localStorage.getItem("ss_movements")||"[]").forEach(m=>state.movements.set(m.id,m)); }catch{}
 }
 
 /* ───────────────────────── DOM helpers ───────────────────────── */
@@ -730,6 +846,17 @@ async function deleteProduct(code){
 async function upsertUnit(u){ saveUnitLocal(u); await push({kind:"upsertUnit", row:{...u}}); }
 async function removeUnit(id){ state.units.delete(id); saveCache(); renderAll(); await push({kind:"deleteUnit", id}); }
 
+// Log one in/out event for the dashboard / history. Fire-and-forget — failures
+// (e.g. the movements table doesn't exist yet) get queued and flushed later.
+function logMovement({code, serial=null, kind, qty=1}){
+  const m = { id: uuid(), code, serial: serial||null, kind, qty,
+              shelf: state.shelf||null, at: nowISO() };
+  state.movements.set(m.id, m);
+  saveCache();
+  if(currentTab==="dash") renderDashboard();
+  push({kind:"insertMovement", row:m});
+}
+
 /* ───────────────────────── CHECK-IN / CHECK-OUT (D) ───────────────────────── */
 function applyQtyAction(p){
   const before=p.qty||0;
@@ -739,6 +866,7 @@ function applyQtyAction(p){
   const np={...p, qty:after};
   if(state.mode==="in" && state.shelf) np.loc=state.shelf;   // session shelf → product's current location
   upsertProduct(np);
+  logMovement({code:p.code, kind:state.mode, qty:1});
   const oh=onHand(p.code);
   const shelfTag = (state.mode==="in" && state.shelf) ? ` · ${state.shelf}` : "";
   toast(`${p.name||p.code} · ${state.mode==="in"?t("checkIn"):t("checkOut")} → ${oh} ${t("onHandShort")}${shelfTag}`, "ok");
@@ -754,12 +882,14 @@ function applySerialAction(p, serial){
     const loc = state.shelf || (existing && existing.loc) || null;   // session shelf → this unit's location
     const u = existing? {...existing, status:"in", checked_in_at:nowISO(), loc} : {id:uuid(), code:p.code, serial, status:"in", checked_in_at:nowISO(), checked_out_at:null, loc};
     upsertUnit(u);
+    logMovement({code:p.code, serial, kind:"in", qty:1});
     toast(`SN ${serial} ${t("checkedIn")} → ${onHand(p.code)} ${t("onHandShort")}${state.shelf?` · ${state.shelf}`:""}`, "ok");
     showUndo(`SN ${serial} ${t("checkedIn")}`, ()=>{ if(prev) upsertUnit(prev); else removeUnit(u.id); });
   } else {
     if(!existing || existing.status==="out"){ toast(`${t("notInStock")} · ${serial}`,"warn"); return; }
     const prev={...existing};
     upsertUnit({...existing, status:"out", checked_out_at:nowISO()});
+    logMovement({code:p.code, serial, kind:"out", qty:1});
     toast(`SN ${serial} ${t("checkedOut")} → ${onHand(p.code)} ${t("onHandShort")}`, "ok");
     showUndo(`SN ${serial} ${t("checkedOut")}`, ()=> upsertUnit(prev));
   }
@@ -1248,6 +1378,158 @@ function importUnits(text){
   toast(n>0 ? `${t("importUnits")}: ${n}` : t("importedZero"), n>0?"ok":"warn");
 }
 
+/* ───────────────────────── DASHBOARD (movements / chart / log) ─────────────────────────
+   All filtering and bucketing is done in Asia/Bangkok local days/hours so the
+   "Today" cards and the per-day chart match wall-clock expectations in Thailand. */
+function totalStockNow(){
+  let total=0;
+  for(const code of state.products.keys()) total += onHand(code);
+  return total;
+}
+function dashRangeKeys(){
+  const today = bkkToday();
+  const ds = state.dash;
+  if(ds.range==="1d")  return { startKey:today,                endKey:bkkAddDays(today,1),  bucket:"hour" };
+  if(ds.range==="7d")  return { startKey:bkkAddDays(today,-6), endKey:bkkAddDays(today,1),  bucket:"day"  };
+  if(ds.range==="30d") return { startKey:bkkAddDays(today,-29),endKey:bkkAddDays(today,1),  bucket:"day"  };
+  if(ds.range==="all") return { startKey:null,                 endKey:null,                  bucket:"day"  };
+  if(ds.range==="custom"){
+    const a = ds.from || today, b = ds.to || today;
+    const lo = a<=b ? a : b, hi = a<=b ? b : a;
+    return { startKey:lo, endKey:bkkAddDays(hi,1), bucket: lo===hi ? "hour" : "day" };
+  }
+  return { startKey:today, endKey:bkkAddDays(today,1), bucket:"hour" };
+}
+function filterMovementsForDash(){
+  const {startKey,endKey} = dashRangeKeys();
+  const code = state.dash.productCode;
+  const out=[];
+  for(const m of state.movements.values()){
+    if(code && m.code!==code) continue;
+    const k = bkkDateKey(m.at);
+    if(startKey && k<startKey) continue;
+    if(endKey   && k>=endKey)  continue;
+    out.push(m);
+  }
+  return out;
+}
+function renderDashCards(){
+  const today = bkkToday();
+  let inToday=0, outToday=0;
+  for(const m of state.movements.values()){
+    if(bkkDateKey(m.at)!==today) continue;
+    if(state.dash.productCode && m.code!==state.dash.productCode) continue;
+    if(m.kind==="in")  inToday  += (m.qty||1);
+    if(m.kind==="out") outToday += (m.qty||1);
+  }
+  const total = state.dash.productCode ? onHand(state.dash.productCode) : totalStockNow();
+  $("#dashTodayIn").textContent  = inToday.toLocaleString();
+  $("#dashTodayOut").textContent = outToday.toLocaleString();
+  $("#dashTotal").textContent    = total.toLocaleString();
+}
+function renderDashProductOptions(){
+  const sel = $("#dashProduct"); if(!sel) return;
+  const cur = sel.value;
+  const items = [...state.products.values()].sort((a,b)=> (a.name||a.code).localeCompare(b.name||b.code));
+  sel.innerHTML = `<option value="">${t("allProducts")}</option>` +
+    items.map(p=>`<option value="${p.code}">${(p.name||p.code).replace(/</g,"&lt;")}</option>`).join("");
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  else { sel.value = state.dash.productCode || ""; }
+}
+function renderDashChart(moves){
+  const wrap = $("#dashChart"); if(!wrap) return;
+  const {startKey,endKey,bucket} = dashRangeKeys();
+
+  // Build the list of bucket keys ("YYYY-MM-DD" per day, or "00".."23" for hour mode)
+  let keys=[];
+  if(bucket==="hour"){
+    keys = Array.from({length:24}, (_,h)=> String(h).padStart(2,"0"));
+  } else if(startKey && endKey){
+    let k=startKey;
+    while(k<endKey){ keys.push(k); k=bkkAddDays(k,1); }
+  } else {
+    // all-time: derive keys from movements actually present
+    const set = new Set();
+    for(const m of moves) set.add(bkkDateKey(m.at));
+    keys = [...set].sort();
+    if(!keys.length) keys = [bkkToday()];
+  }
+  const data = {};
+  keys.forEach(k=> data[k] = {in:0,out:0});
+  for(const m of moves){
+    const k = bucket==="hour" ? bkkHourKey(m.at) : bkkDateKey(m.at);
+    if(!data[k]) data[k] = {in:0,out:0};
+    data[k][m.kind] += (m.qty||1);
+  }
+  // ensure correct iteration order even when "all" added extra keys
+  keys = Object.keys(data).sort();
+
+  const max = Math.max(1, ...keys.map(k=> Math.max(data[k].in, data[k].out)));
+  const W=600, H=220, padL=28, padR=10, padT=10, padB=28;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const groupW = innerW / Math.max(1, keys.length);
+  const barW = Math.max(2, Math.min(18, groupW*0.4));
+
+  const ticks = 4;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img">`;
+  // Y gridlines + labels
+  for(let i=0;i<=ticks;i++){
+    const y = padT + innerH * (1 - i/ticks);
+    const v = Math.round(max * i/ticks);
+    svg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(0,0,0,.08)" stroke-width="1"/>`;
+    svg += `<text x="${padL-4}" y="${y+3}" text-anchor="end" font-size="9" fill="#888">${v}</text>`;
+  }
+  // bars
+  keys.forEach((k,i)=>{
+    const cx = padL + groupW*i + groupW/2;
+    const inH  = innerH * (data[k].in  / max);
+    const outH = innerH * (data[k].out / max);
+    svg += `<rect x="${cx-barW-1}" y="${padT+innerH-inH}"  width="${barW}" height="${inH}"  fill="#22c55e" rx="2"/>`;
+    svg += `<rect x="${cx+1}"      y="${padT+innerH-outH}" width="${barW}" height="${outH}" fill="#ef4444" rx="2"/>`;
+    // x label every Nth tick to avoid clutter
+    const step = Math.max(1, Math.ceil(keys.length/8));
+    if(i%step===0 || i===keys.length-1){
+      const lbl = bucket==="hour" ? k : k.slice(5);   // "MM-DD" or "HH"
+      svg += `<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="9" fill="#666">${lbl}</text>`;
+    }
+  });
+  // legend
+  svg += `<g font-size="10" fill="#444">
+    <rect x="${padL}" y="2" width="9" height="9" fill="#22c55e" rx="2"/><text x="${padL+13}" y="10">${t("checkIn")}</text>
+    <rect x="${padL+70}" y="2" width="9" height="9" fill="#ef4444" rx="2"/><text x="${padL+83}" y="10">${t("checkOut")}</text>
+  </g>`;
+  svg += `</svg>`;
+  wrap.innerHTML = svg;
+}
+function renderDashLog(moves){
+  const log = $("#dashLog"); if(!log) return;
+  if(!moves.length){
+    log.innerHTML = `<div class="empty">${state.movements.size ? t("noActivity") : t("noMovementsYet")}</div>`;
+    return;
+  }
+  const sorted = [...moves].sort((a,b)=> (b.at||"").localeCompare(a.at||""));
+  log.innerHTML = sorted.slice(0,300).map(m=>{
+    const p = state.products.get(m.code);
+    const name = (p?.name || m.code).replace(/</g,"&lt;");
+    const meta = [m.serial?`SN ${m.serial}`:null, m.shelf||null].filter(Boolean).join(" · ");
+    const sign = m.kind==="in" ? "+" : "−";
+    return `<div class="log-row">
+      <span class="time">${bkkFmtDateTime(m.at)}</span>
+      <span class="name">${name}</span>
+      <span class="qty ${m.kind}">${sign}${m.qty||1}</span>
+      <span class="meta">${meta}</span>
+    </div>`;
+  }).join("");
+}
+function renderDashboard(){
+  if(currentTab!=="dash") return;
+  renderDashProductOptions();
+  renderDashCards();
+  const moves = filterMovementsForDash();
+  renderDashChart(moves);
+  renderDashLog(moves);
+}
+
 /* ───────────────────────── PASSCODE GATE (B) ───────────────────────── */
 function isUnlocked(){ return localStorage.getItem("ss_unlocked")==="1"; }
 function unlock(){ localStorage.setItem("ss_unlocked","1"); $("#gate").classList.add("hide"); $("#app").classList.remove("hide"); }
@@ -1281,10 +1563,14 @@ window.addEventListener("offline",()=>{ state.online=false; setNet(); });
 
 /* ───────────────────────── WIRING ───────────────────────── */
 // tabs
+let currentTab = "inv";
 document.querySelectorAll("nav.tabs button").forEach(b=> b.onclick=()=>{
+  currentTab = b.dataset.tab;
   document.querySelectorAll("nav.tabs button").forEach(x=>x.classList.toggle("on",x===b));
-  $("#view-inv").classList.toggle("on", b.dataset.tab==="inv");
-  $("#view-scan").classList.toggle("on", b.dataset.tab==="scan");
+  $("#view-inv").classList.toggle("on",  currentTab==="inv");
+  $("#view-scan").classList.toggle("on", currentTab==="scan");
+  $("#view-dash").classList.toggle("on", currentTab==="dash");
+  if(currentTab==="dash") renderDashboard();
 });
 // language
 document.querySelectorAll(".lang button").forEach(b=> b.onclick=()=>{ lang=b.dataset.lang; localStorage.setItem("ss_lang",lang); applyLang(); renderAll(); });
@@ -1318,6 +1604,26 @@ $("#expProd").onclick=exportProducts; $("#expUnits").onclick=exportUnits;
 $("#impProd").onclick=()=>$("#fileProd").click(); $("#impUnits").onclick=()=>$("#fileUnits").click();
 $("#fileProd").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>importProducts(r.result); r.readAsText(f); e.target.value=""; };
 $("#fileUnits").onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>importUnits(r.result); r.readAsText(f); e.target.value=""; };
+
+// dashboard wiring
+$("#dashRange").querySelectorAll("button").forEach(b=> b.onclick=()=>{
+  state.dash.range = b.dataset.r;
+  localStorage.setItem("ss_dash_range", state.dash.range);
+  $("#dashRange").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x===b));
+  $("#dashCustomRow").style.display = state.dash.range==="custom" ? "flex" : "none";
+  if(state.dash.range==="custom" && !state.dash.from){
+    // sensible default: last 7 days
+    state.dash.to   = bkkToday();
+    state.dash.from = bkkAddDays(state.dash.to, -6);
+    $("#dashFrom").value = state.dash.from;
+    $("#dashTo").value   = state.dash.to;
+  }
+  renderDashboard();
+});
+$("#dashProduct").addEventListener("change", e=>{ state.dash.productCode = e.target.value; renderDashboard(); });
+$("#dashFrom").addEventListener("change", e=>{ state.dash.from = e.target.value; if(state.dash.range==="custom") renderDashboard(); });
+$("#dashTo").addEventListener("change",   e=>{ state.dash.to   = e.target.value; if(state.dash.range==="custom") renderDashboard(); });
+
 // stop camera when leaving the page/tab
 document.addEventListener("visibilitychange",()=>{ if(document.hidden && scanning) stopCamera(); });
 
@@ -1331,6 +1637,9 @@ async function boot(){
   applyLang();
   $("#modeSwitch").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===state.mode));
   $("#lowChip").classList.toggle("on", state.lowOnly);
+  // restore dashboard range from last session
+  $("#dashRange").querySelectorAll("button").forEach(b=> b.classList.toggle("on", b.dataset.r===state.dash.range));
+  $("#dashCustomRow").style.display = state.dash.range==="custom" ? "flex" : "none";
   loadCache(); renderAll();          // offline-first: show last-known stock immediately
   if(isUnlocked()){ $("#gate").classList.add("hide"); $("#app").classList.remove("hide"); }
   else { $("#userInput").focus(); }
