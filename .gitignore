@@ -1,0 +1,2 @@
+# Local Supabase snapshots created before destructive operations — keep out of git
+.backups/

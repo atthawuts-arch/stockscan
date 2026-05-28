@@ -881,7 +881,9 @@ function assignRoles(codes){
   if(!product) product = codes.find(c=> PRODUCT_SYMBOLOGIES.includes(c.format));
   if(!product) product = [...codes].sort((a,b)=> (a.boundingBox?.y??0)-(b.boundingBox?.y??0))[0];
 
-  const other = codes.find(c=> c!==product) || null;
+  // Serial: only a NON-product-symbology code (Code 128 / QR / Data Matrix / Code 39).
+  // A second EAN/UPC in frame is almost certainly another product, not a serial — ignore it.
+  const other = codes.find(c=> c!==product && !PRODUCT_SYMBOLOGIES.includes(c.format)) || null;
   return { productCode:product.rawValue, serial: other? other.rawValue : null };
 }
 
@@ -907,29 +909,69 @@ function promptAddUnknown(code, serial=null){
 }
 
 /* (Auto-create then confirm) Unknown barcode scanned at CHECK-IN:
-   create the product on the fly, count the scan immediately (keeps scanning fast),
-   then offer a quick name edit. Name source is your product master (CSV import);
-   until named, the barcode itself is the placeholder name. A scanned serial makes
-   it serialized so the S/N is filed as a sub-item under this product/barcode. */
+   Pick tracking from what the camera saw — a non-EAN/UPC second code (Code 128 / QR /
+   etc.) means it's a serialized item with an S/N, so check the S/N in IMMEDIATELY
+   (snappy receive flow). One code only → quantity, +1 immediately. Then a confirm
+   modal opens for naming + a tracking toggle as the safety net: if the auto-decision
+   was wrong (e.g., a stray batch barcode got read as a serial), flip the toggle and
+   we reverse the action (remove the unit / restore +1) and re-apply the right one. */
 function confirmNewProduct(code, serial){
-  const tracking = serial ? "serial" : "quantity";
-  upsertProduct({ code, name:code, cost:0, min:0, loc:"", tracking, qty:0 });
-  const p = state.products.get(code);
-  if(tracking==="serial") applySerialAction(p, serial);   // mode is 'in' on this path
-  else applyQtyAction(p);
-  hideUndo();   // the name confirm below is the primary interaction here
+  const initialTracking = serial ? "serial" : "quantity";
+  upsertProduct({ code, name:code, cost:0, min:0, loc:"", tracking:initialTracking, qty:0 });
+  const pNew = state.products.get(code);
+  if(initialTracking==="serial") applySerialAction(pNew, serial);   // instant S/N check-in
+  else applyQtyAction(pNew);                                        // instant +1
+  hideUndo();   // make room for the name/tracking confirm
+
+  let chosenTracking = initialTracking;
   openModal(`<h2>${t("newProduct")}</h2>
     <div class="sub"><span>${code}</span>
-      <span class="tag ${tracking==='serial'?'serial':''}">${tracking==='serial'?t('serialized'):t('quantity')}</span>
       ${serial?`<span>· SN ${serial}</span>`:""}${state.shelf?`<span>· ${state.shelf}</span>`:""}</div>
     <div class="field"><label>${t('name')}</label>
       <input id="npName" inputmode="text" value="${code}" placeholder="${t('namePh')}" /></div>
+    <div class="field"><label>${t('tracking')}</label>
+      <div class="seg" id="npTrack">
+        <button type="button" data-v="quantity" class="${initialTracking==='quantity'?'on':''}">${t("quantity")}</button>
+        <button type="button" data-v="serial" class="${initialTracking==='serial'?'on':''}">${t("serialized")}</button>
+      </div></div>
+    <div class="field" id="npSnField" style="display:${initialTracking==='serial'?'block':'none'}">
+      <label>${t('scanOrConfirmSerial')}</label>
+      <input id="npSn" inputmode="text" value="${serial||''}" placeholder="SN…" /></div>
     <div class="row"><button class="btn" id="npSkip">${t('skip')}</button>
       <button class="btn primary" id="npSave">${t('save')}</button></div>`);
   $("#npName").focus(); $("#npName").select();
+
+  $("#npTrack").querySelectorAll("button").forEach(b=> b.onclick=()=>{
+    chosenTracking = b.dataset.v;
+    $("#npTrack").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+    $("#npSnField").style.display = chosenTracking==="serial" ? "block" : "none";
+    if(chosenTracking==="serial") $("#npSn").focus();
+  });
+
   $("#npSkip").onclick=closeSheet;
-  $("#npSave").onclick=()=>{ const nm=$("#npName").value.trim()||code; upsertProduct({...state.products.get(code), name:nm}); closeSheet(); };
+  $("#npSave").onclick=()=>{
+    const nm = $("#npName").value.trim() || code;
+    const cur = state.products.get(code);
+
+    if(chosenTracking === initialTracking){
+      // No tracking change — just rename
+      upsertProduct({...cur, name:nm});
+    } else if(chosenTracking==="serial" && initialTracking==="quantity"){
+      // upgrade quantity → serial: need an S/N, reverse the +1, then check in the S/N
+      const sn = ($("#npSn").value||"").trim();
+      if(!sn){ toast(t("serialNeeded"),"warn"); $("#npSn").focus(); return; }
+      upsertProduct({...cur, name:nm, tracking:"serial", qty:0});
+      applySerialAction(state.products.get(code), sn);
+    } else {
+      // downgrade serial → quantity: remove the auto-created unit, then apply +1
+      if(serial){ const u = findUnit(code, serial); if(u) removeUnit(u.id); }
+      upsertProduct({...cur, name:nm, tracking:"quantity", qty:0});
+      applyQtyAction(state.products.get(code));
+    }
+    closeSheet();
+  };
   $("#npName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#npSave").click(); }});
+  $("#npSn").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#npSave").click(); }});
 }
 
 /* ───────────────────────── PRODUCT SHEET (G) ───────────────────────── */
@@ -1123,26 +1165,72 @@ function exportUnits(){
   const rows=[head, ...[...state.units.values()].map(u=>[u.code,u.serial,u.status,u.loc||""])];
   download("stockscan-units.csv", toCSV(rows));
 }
-function downloadTemplate(){   // ready-to-fill products file: exact columns + two examples
-  const head=["code","name","cost","min","loc","tracking","qty"];
+function downloadTemplate(){   // ready-to-fill products file: exact columns + worked examples
+  // Combined format: leave `serial` blank for quantity items; one row per S/N for serialized items.
+  const head=["code","name","cost","min","loc","tracking","qty","serial"];
   const rows=[head,
-    ["LOGA-AUR65","LOGA Aurora 65 Keyboard","2990","3","A-01","serial","0"],
-    ["LOGA-GRD-XL","LOGA Garuda Mousepad XL","590","8","B-02","quantity","48"]];
+    ["LOGA-AUR65","LOGA Aurora 65 Keyboard","2990","3","A-01","serial","0","SN-AUR-0001"],
+    ["LOGA-AUR65","LOGA Aurora 65 Keyboard","2990","3","A-01","serial","0","SN-AUR-0002"],
+    ["LOGA-AUR65","LOGA Aurora 65 Keyboard","2990","3","A-01","serial","0","SN-AUR-0003"],
+    ["LOGA-GRD-XL","LOGA Garuda Mousepad XL","590","8","B-02","quantity","48",""]];
   download("loga-stock-template.csv", toCSV(rows));
 }
 function importProducts(text){
+  // Unified import: one file does both products AND their serials.
+  // - Rows with a `serial` column filled → product is serial-tracked + that S/N gets checked in.
+  //   Same `code` may appear on many rows (one per S/N) — product is upserted once, all S/Ns are added.
+  // - Rows with no `serial` → product as before (quantity unless `tracking` column says serial).
+  // Backward-compatible: files without a `serial` column work exactly like before.
   const rows=parseCSV(text); if(rows.length<2){ toast(t("importedZero"),"warn"); return; }
   const head=rows[0].map(h=>h.trim().toLowerCase()); const col=colMap(head);
-  if(col.code===undefined){ toast(t("noCodeColumn"),"err"); return; }   // wrong columns → say so clearly
+  if(col.code===undefined){ toast(t("noCodeColumn"),"err"); return; }
   const get=(r,f)=> col[f]!==undefined ? (r[col[f]]||"") : "";
-  let n=0;
-  for(let i=1;i<rows.length;i++){ const r=rows[i]; const code=get(r,"code").trim(); if(!code) continue;
-    const tracking=isSerial(get(r,"tracking"))?"serial":"quantity";
-    upsertProduct({ code, name:get(r,"name").trim()||code,
+
+  // Pass 1: group rows by code; per code keep the first row's template fields + collect all S/Ns
+  const tpl = new Map();        // code → first row (used for name/cost/min/loc/tracking/qty/locked)
+  const sns = new Map();        // code → [{serial, status, loc}, …]
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]; const code=get(r,"code").trim(); if(!code) continue;
+    if(!tpl.has(code)) tpl.set(code, r);
+    const serial=get(r,"serial").trim();
+    if(serial){
+      const status = get(r,"status").trim().toLowerCase()==="out" ? "out" : "in";
+      const loc = get(r,"loc").trim() || null;
+      if(!sns.has(code)) sns.set(code, []);
+      sns.get(code).push({serial, status, loc});
+    }
+  }
+
+  // Pass 2: upsert each unique product (forcing serial-tracking if any S/N appeared), then upsert units
+  let nProducts=0, nUnits=0;
+  for(const [code, r] of tpl){
+    const hasSn = sns.has(code);
+    const tracking = (hasSn || isSerial(get(r,"tracking"))) ? "serial" : "quantity";
+    upsertProduct({
+      code, name:get(r,"name").trim()||code,
       cost:parseFloat(get(r,"cost"))||0, min:parseInt(get(r,"min")||"0",10)||0,
-      loc:get(r,"loc").trim(), tracking, qty: tracking==="serial"?0:(parseInt(get(r,"qty")||"0",10)||0),
-      locked: col.locked!==undefined ? isTrue(get(r,"locked")) : false }); n++; }
-  toast(n>0 ? `${t("importProducts")}: ${n}` : t("importedZero"), n>0?"ok":"warn");
+      loc:get(r,"loc").trim(), tracking,
+      qty: tracking==="serial" ? 0 : (parseInt(get(r,"qty")||"0",10)||0),
+      locked: col.locked!==undefined ? isTrue(get(r,"locked")) : false,
+    });
+    nProducts++;
+    if(hasSn){
+      for(const sn of sns.get(code)){
+        const existing = findUnit(code, sn.serial);
+        const u = existing
+          ? {...existing, status:sn.status, loc:sn.loc||existing.loc||null}
+          : { id:uuid(), code, serial:sn.serial, status:sn.status,
+              checked_in_at: sn.status==="in" ? nowISO() : null,
+              checked_out_at: sn.status==="out" ? nowISO() : null,
+              loc: sn.loc };
+        upsertUnit(u); nUnits++;
+      }
+    }
+  }
+
+  if(nProducts===0) toast(t("importedZero"),"warn");
+  else if(nUnits>0) toast(`${t("importProducts")}: ${nProducts} · ${t("importUnits")}: ${nUnits}`, "ok");
+  else              toast(`${t("importProducts")}: ${nProducts}`, "ok");
 }
 function importUnits(text){
   const rows=parseCSV(text); if(rows.length<2){ toast(t("importedZero"),"warn"); return; }
